@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sharpstats
+          POSTGRES_USER: sharpstats
+          POSTGRES_PASSWORD: sharpstats
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sharpstats -d sharpstats"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://sharpstats:sharpstats@localhost:5432/sharpstats
+      JWT_SECRET: ci-only-secret-that-is-long-enough-123456789
+      CLIENT_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate --workspace backend
+      - name: Apply database schema
+        run: PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/schema.sql && PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/seed.sql
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm audit --audit-level=high

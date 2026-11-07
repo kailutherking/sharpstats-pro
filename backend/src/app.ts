@@ -1,0 +1,28 @@
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import authRoutes from "./routes/auth";
+import betRoutes from "./routes/bets";
+import analyticsRoutes from "./routes/analytics";
+import bankrollRoutes from "./routes/bankroll";
+import oddsRoutes from "./routes/odds";
+import profileRoutes from "./routes/profile";
+import { errorHandler, notFound } from "./middleware/errors";
+
+export const app = express();
+app.disable("x-powered-by");
+app.use(helmet());
+app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(",") ?? "http://localhost:5173", credentials: true }));
+app.use(cookieParser());
+app.use(express.json({ limit: "1mb" }));
+app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }), authRoutes);
+app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+app.use("/api/bets", betRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/bankroll", bankrollRoutes);
+app.use("/api", oddsRoutes);
+app.use("/api/profile", profileRoutes);
+app.use(notFound);
+app.use(errorHandler);

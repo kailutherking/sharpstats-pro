@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { font-family: "DM Sans", sans-serif; color: #eef2ed; background: #0b0f12; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+.font-display { font-family: "Manrope", sans-serif; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: #20292e; }
+
+.light-mode { color: #17211b; }
+.light-mode aside { background-color: #fff; border-color: #dce3dd; }
+.light-mode main > header { background-color: rgb(248 250 247 / 92%); border-color: #dce3dd; }
+.light-mode [class~="bg-panel"] { background-color: #fff; border-color: #dce3dd; }
+.light-mode [class~="bg-canvas"] { background-color: #f3f5f2; }
+.light-mode [class~="border-line"] { border-color: #dce3dd; }
+.light-mode [class~="text-white"] { color: #17211b; }
+.light-mode [class~="text-muted"] { color: #64716a; }
+.light-mode [class~="bg-[#0c1114]"],
+.light-mode [class~="bg-[#11171b]"],
+.light-mode [class~="bg-[#0e1416]"],
+.light-mode [class~="bg-[#131a1d]"] { background-color: #f4f7f3; }
+.light-mode [class~="bg-[#0e1316]"] { background-color: #fff; }
+.light-mode [class~="bg-[#20292e]"] { background-color: #e7ece7; }
+.light-mode [class~="text-[#d9e0dc]"] { color: #34413a; }
