@@ -14,7 +14,19 @@ import { errorHandler, notFound } from "./middleware/errors";
 export const app = express();
 app.disable("x-powered-by");
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(",") ?? "http://localhost:5173", credentials: true }));
+const allowedOrigins = new Set([
+  "http://localhost:5173",
+  "http://localhost:5175",
+  "http://localhost:5177",
+  "http://192.168.1.180:5173",
+  "http://192.168.1.180:5175",
+  "http://192.168.1.180:5177",
+  "http://192.168.1.179:5173",
+  "http://192.168.1.179:5175",
+  "http://192.168.1.179:5177",
+  ...(process.env.CLIENT_ORIGIN?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? []),
+]);
+app.use(cors({ origin: [...allowedOrigins], credentials: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }), authRoutes);

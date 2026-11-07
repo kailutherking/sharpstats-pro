@@ -12,6 +12,10 @@
 
 The demo account is `demo@sharpstats.pro` / `SharpStats123!`. Do not reuse demo credentials in any shared or deployed environment.
 
+## Access from a phone on the LAN
+
+Vite reads `frontend/.env.local` automatically when it starts. Set `VITE_API_URL` to this computer's current LAN IPv4 address, for example `http://192.168.1.179:4000/api`, and restart Vite after changing it. Start Vite with `npm run dev --workspace frontend -- --host 0.0.0.0 --port 5175`; open `http://<computer-LAN-IP>:5175` on the phone. The API's development CORS allowlist includes the localhost and LAN origins on ports 5173, 5175, and 5177. Update the local API URL if the router changes this computer's address.
+
 ## Architecture
 
 - React Query owns cached remote data; Zustand owns client authentication state.

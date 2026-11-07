@@ -2,6 +2,13 @@
 
 All notable changes to SharpStats Pro are documented here.
 
+## [1.1.1] - 2026-11-07
+
+### Fixed
+- Frontend API requests now use the configured Vite API URL, with network and HTTP failure diagnostics.
+- Added LAN frontend origins to the API CORS allowlist and documented phone-on-Wi-Fi setup.
+- Prevented local Vite environment files from entering the Docker build context.
+
 ## [1.1.0] - 2026-11-07
 
 ### Added

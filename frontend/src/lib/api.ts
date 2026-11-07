@@ -1,7 +1,34 @@
-import type { Bankroll, Bet, OddsMovement, Performance, ResearchData, Summary, User } from "./types";
+import type {
+  Bankroll,
+  Bet,
+  OddsMovement,
+  Performance,
+  ResearchData,
+  Summary,
+  User,
+} from "./types";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+const API_URL = (
+  import.meta.env.VITE_API_URL ||
+  `http://${window.location.hostname}:4000/api`
+).replace(/\/+$/, "");
+
+console.log("API URL:", API_URL);
+
 const TOKEN_KEY = "sharpstats_token";
+
+async function fetchApi(path: string, options: RequestInit): Promise<Response> {
+  try {
+    const response = await fetch(`${API_URL}${path}`, options);
+    if (!response.ok) {
+      console.error("API Error", { path, status: response.status, apiUrl: API_URL });
+    }
+    return response;
+  } catch (error) {
+    console.error("API Error", { path, status: 0, apiUrl: API_URL });
+    throw error;
+  }
+}
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -18,7 +45,7 @@ let refreshRequest: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshRequest) {
-    refreshRequest = fetch(`${API_URL}/auth/refresh`, {
+    refreshRequest = fetchApi("/auth/refresh", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -40,13 +67,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const options: RequestInit = { ...init, headers, credentials: "include" };
-  let response = await fetch(`${API_URL}${path}`, options);
+  let response = await fetchApi(path, options);
   const isPublicAuthRoute = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"].includes(path);
   if (response.status === 401 && !isPublicAuthRoute) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       headers.set("Authorization", `Bearer ${refreshed}`);
-      response = await fetch(`${API_URL}${path}`, options);
+      response = await fetchApi(path, options);
     }
   }
   if (!response.ok) {
@@ -63,12 +90,12 @@ async function download(path: string): Promise<Blob> {
   const token = tokenStore.get();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const options: RequestInit = { headers, credentials: "include" };
-  let response = await fetch(`${API_URL}${path}`, options);
+  let response = await fetchApi(path, options);
   if (response.status === 401) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       headers.set("Authorization", `Bearer ${refreshed}`);
-      response = await fetch(`${API_URL}${path}`, options);
+      response = await fetchApi(path, options);
     }
   }
   if (!response.ok) {

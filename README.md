@@ -29,6 +29,8 @@ The database schema and example sportsbooks are initialized and upgraded automat
 3. Run `npm ci` from the root, `npm run prisma:generate --workspace backend`, then `npm run dev`.
 4. Visit the frontend at port 5173 and use the demo credentials above.
 
+To test on a phone on the same Wi-Fi, set `VITE_API_URL` in the ignored `frontend/.env.local` to `http://<computer-LAN-IP>:4000/api`, start Vite with `npm run dev --workspace frontend -- --host 0.0.0.0 --port 5175`, and open `http://<computer-LAN-IP>:5175` on the phone. See the [LAN development guide](./docs/DEVELOPMENT.md#access-from-a-phone-on-the-lan).
+
 ## Project structure
 
 ```text
