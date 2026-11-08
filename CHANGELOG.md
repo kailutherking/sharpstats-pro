@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-08
+
+### Added
+- `ODDS_PROVIDER` setting: `theoddsapi` (primary), `espn` (keyless DraftKings only) or `auto`. If `theoddsapi` is set without `ODDS_API_KEY`, the server falls back to ESPN and the Odds screen and `/api/odds/status` show a warning.
+- Reverse line movement (estimated): flags game lines that moved 2.5%+ implied (about a point) since open toward the underdog or under, backed by most books with history. Shown as an RLM badge, a Line movement panel and a new `reverse_move` alert type. The providers don't publish public ticket/handle splits, so the favorite and the over are treated as the public side.
+- EV confidence rating (0–100 with reasons) based on sharp reference vs consensus, number of books, price freshness, odds length, prop status and edge size. Shown in the +EV scanner.
+- Worst available price per selection, alongside the best price.
+- Market range history: a new `odds_selection_history` table records best/worst price, market average and fair value whenever they change. The line history drawer adds a "Best vs worst" chart.
+- Sportsbook comparison adds Edge and EV columns. The worst price shows on hover over Best.
+- "Props only" filter toggle.
+- `GET /api/odds/props` (alias of `/api/odds/player-props`). `/api/odds/history` returns `range`, `/api/odds/movement` returns `reverse`.
+- Versioned SQL migrations: numbered files in `backend/src/db/migrations`, applied once in order inside a transaction, checksummed in `schema_migrations`, guarded by an advisory lock. Run on API startup and via `npm run db:migrate`. CI applies them.
+- Browser tab icon (fixes the `favicon.ico` 404).
+
+### Changed
+- `odds.aggregate.service.ts` is renamed to `oddsAggregator.service.ts`.
+- docker-compose passes `ODDS_PROVIDER` (default `theoddsapi`).
+
+### Fixed
+- `docs/API.md` listed the old Market Lab paths (`/odds`, `/odds/movement`) instead of `/odds/scan` and `/odds/snapshots`.
+
 ## [1.2.0] - 2026-11-08
 
 ### Added
@@ -57,5 +78,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Docker now serves the production frontend through Nginx and prunes development dependencies from the backend image.
 - Odds and analysis features are documented as quota-dependent, on-demand research rather than guaranteed predictions.
 
-[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/kailutherking/sharpstats-pro/compare/0398248...v1.2.0

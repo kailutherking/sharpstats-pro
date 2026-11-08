@@ -6,9 +6,10 @@ dotenv.config({ path: process.env.ENV_FILE ?? "../.env" });
 const port = Number(process.env.PORT ?? 4000);
 
 async function start(): Promise<void> {
-  const [{ app }, { pool }, { prisma }, { seedDemoAccount }, { startStatsRefreshScheduler }, { startOddsScheduler }] = await Promise.all([
+  const [{ app }, { pool }, { runMigrations }, { prisma }, { seedDemoAccount }, { startStatsRefreshScheduler }, { startOddsScheduler }] = await Promise.all([
     import("./app"),
     import("./db/pool"),
+    import("./db/migrate"),
     import("./db/prisma"),
     import("./services/seedDemo"),
     import("./services/stats.service"),
@@ -20,6 +21,8 @@ async function start(): Promise<void> {
   const schemaPath = path.join(process.cwd(), "src", "db", "schema.sql");
   const seedPath = path.join(process.cwd(), "src", "db", "seed.sql");
   await pool.query(await readFile(schemaPath, "utf8"));
+  const migrated = await runMigrations(pool);
+  if (migrated.length) console.info(`Applied database migrations: ${migrated.join(", ")}`);
   await pool.query(await readFile(seedPath, "utf8"));
   await pool.query("SELECT 1");
   await seedDemoAccount();

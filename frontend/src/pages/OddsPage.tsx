@@ -165,8 +165,8 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
     setHistoryFor({
       id: selectionId, pairId: "", gameId, sport, market, marketLabel: data?.markets.find((item) => item.key === market)?.label ?? market,
       category: "game", type: "moneyline", period: "game", selection: side, participant, point: null,
-      label: participant ? `${participant} ${side}` : side, books: [], best: null, average: null, fair: null, ev: null, edge: null, kelly: null,
-      tier: null, risk: null, arbitrage: null, signals: { steam: false, sharp: false, moves: 0, lastMoveAt: null }, updatedAt: "",
+      label: participant ? `${participant} ${side}` : side, books: [], best: null, worst: null, average: null, fair: null, ev: null, edge: null, kelly: null,
+      tier: null, risk: null, confidence: null, arbitrage: null, signals: { steam: false, sharp: false, reverse: false, moves: 0, lastMoveAt: null }, updatedAt: "",
     });
   }, [data, sport]);
 
@@ -301,7 +301,8 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
       )}
 
       {message && <div className="mb-4"><Notice>{message}</Notice></div>}
-      {status && keyless && <div className="mb-4"><Notice tone="warn">{status.notes[0]}</Notice></div>}
+      {status?.warning && <div className="mb-4"><Notice tone="warn">{status.warning}</Notice></div>}
+      {status && keyless && !status.warning && status.notes.some((note) => note.startsWith("Keyless")) && <div className="mb-4"><Notice tone="warn">{status.notes.find((note) => note.startsWith("Keyless"))}</Notice></div>}
       {status?.lastError && <div className="mb-4"><Notice tone="error">Provider issue: {status.lastError}. Showing the last good snapshot.</Notice></div>}
       {status?.throttled && <div className="mb-4"><Notice tone="warn">{status.notes.find((note) => note.includes("credits"))}</Notice></div>}
 
@@ -330,7 +331,7 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
               onOpen={(alert) => { if (alert.sideId) openSelection(alert.sideId); else setGameFor(alert.gameId); }} />
           )}
           {tab === "clv" && <ClvTracker data={clv.data} loading={clv.isLoading} />}
-          <p className="mt-4 text-[10px] text-muted">Source: {data.status.label}. {data.status.notes.filter((note) => !note.startsWith("Keyless")).join(" ")} Odds are informational; confirm prices with the sportsbook before wagering.</p>
+          <p className="mt-4 text-[10px] text-muted">Source: {data.status.label}. {data.status.notes.filter((note) => !note.startsWith("Keyless") && note !== data.status.warning).join(" ")} Odds are informational; confirm prices with the sportsbook before wagering.</p>
         </>
       ) : null}
 

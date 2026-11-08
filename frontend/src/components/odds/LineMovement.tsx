@@ -1,17 +1,19 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Flame, Users, X, Zap } from "lucide-react";
+import { Flame, Repeat, X, Zap } from "lucide-react";
 import { api } from "../../lib/api";
 import type { BookInfo, MovementData, OddsSport, Selection } from "../../lib/oddsTypes";
 import { american, bookShort, lineMoveText, pct, priceLine, signedPct, timeAgo } from "../../lib/oddsFormat";
-import { EmptyState, LoadingBlock, Panel, thClass } from "../stats/StatsUi";
+import { EmptyState, LoadingBlock, Panel, Segmented, thClass } from "../stats/StatsUi";
 import { BookTag, MoveIndicator, SignalBadges } from "./OddsUi";
 
 const COLORS = ["#c5f467", "#7dd3fc", "#fbbf24", "#f0abfc", "#fb7185", "#34d399", "#a5b4fc", "#fdba74", "#93c5fd", "#e879f9"];
 const tooltipStyle = { background: "#11171b", border: "1px solid #29343a", borderRadius: 12, color: "#eef2ed", fontSize: 12 };
 const axis = { axisLine: false, tickLine: false, tick: { fill: "#849198", fontSize: 10 } };
+
+const RANGE_LABELS: Record<string, string> = { best: "Best price", worst: "Worst price", average: "Market average", fair: "Fair (no-vig)" };
 
 function impliedFromAmerican(value: number): number {
   return value > 0 ? 100 / (value + 100) : Math.abs(value) / (Math.abs(value) + 100);
@@ -26,7 +28,22 @@ export function LineHistoryDrawer({ sport, selection, books, onClose }: { sport:
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const [view, setView] = useState<"books" | "range">("books");
   const live = history.data?.selection ?? selection;
+  const range = useMemo(() => {
+    const rows = (history.data?.range ?? []).map((point) => ({
+      at: point.at,
+      label: new Date(point.at).toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" }),
+      best: Math.round(impliedFromAmerican(point.bestAmerican) * 1000) / 10,
+      worst: point.worstAmerican === null ? null : Math.round(impliedFromAmerican(point.worstAmerican) * 1000) / 10,
+      average: point.averageImplied === null ? null : Math.round(point.averageImplied * 1000) / 10,
+      fair: point.fairProbability === null ? null : Math.round(point.fairProbability * 1000) / 10,
+      bestLabel: `${american(point.bestAmerican)} ${bookShort(point.bestBook)}`,
+      worstLabel: point.worstAmerican === null ? "—" : `${american(point.worstAmerican)} ${point.worstBook ? bookShort(point.worstBook) : ""}`,
+    }));
+    if (rows.length) rows.push({ ...rows[rows.length - 1]!, at: new Date().toISOString(), label: "Now" });
+    return rows;
+  }, [history.data]);
   const chart = useMemo(() => {
     const points = history.data?.points ?? [];
     const bookKeys = [...new Set(points.map((point) => point.book))];
@@ -52,14 +69,38 @@ export function LineHistoryDrawer({ sport, selection, books, onClose }: { sport:
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg border border-line p-2 text-muted hover:text-white"><X size={15} /></button>
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Tile label="Best price" value={selection.best ? `${american(selection.best.american)} ${bookShort(selection.best.book)}` : "—"} />
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <Tile label="Best price" value={live.best ? `${american(live.best.american)} ${bookShort(live.best.book)}` : "—"} />
+          <Tile label="Worst price" value={live.worst ? `${american(live.worst.american)} ${bookShort(live.worst.book)}` : "—"} />
           <Tile label="Market average" value={american(live.average?.american)} />
           <Tile label="Fair (no-vig)" value={american(live.fair?.american)} sub={live.fair?.sourceLabel} />
           <Tile label="Fair probability" value={live.fair ? pct(live.fair.probability) : "—"} />
         </div>
-        <Panel title="Odds history" subtitle="Implied probability by sportsbook (higher = shorter price)">
-          {history.isLoading ? <LoadingBlock label="Loading odds history…" /> : chart.rows.length < 2 ? (
+        <Panel title="Odds history" subtitle={view === "books" ? "Implied probability by sportsbook (higher = shorter price)" : "Best and worst available price, market average and fair value over time"}
+          action={<Segmented label="Chart" value={view} onChange={setView} options={[{ value: "books", label: "By sportsbook" }, { value: "range", label: "Best vs worst" }]} />}>
+          {history.isLoading ? <LoadingBlock label="Loading odds history…" /> : view === "range" ? (range.length < 2 ? (
+            <EmptyState>The price range is recorded every time the best price, worst price or fair value changes.</EmptyState>
+          ) : (
+            <div className="h-[280px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={range} margin={{ top: 10, right: 8, left: -14, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 5" vertical={false} />
+                  <XAxis dataKey="label" {...axis} dy={8} minTickGap={28} />
+                  <YAxis {...axis} domain={["auto", "auto"]} tickFormatter={(value: number) => `${value}%`} />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#a9b5b4" }}
+                    formatter={(value: number, name: string, item: { payload?: { bestLabel?: string; worstLabel?: string } }) => [
+                      name === "best" ? `${value}% · ${item.payload?.bestLabel ?? ""}` : name === "worst" ? `${value}% · ${item.payload?.worstLabel ?? ""}` : `${value}%`,
+                      RANGE_LABELS[name] ?? name,
+                    ]} />
+                  <Legend formatter={(value: string) => <span className="text-[10px] text-muted">{RANGE_LABELS[value] ?? value}</span>} />
+                  <Line dataKey="best" type="stepAfter" stroke="#c5f467" strokeWidth={2} dot={false} connectNulls />
+                  <Line dataKey="worst" type="stepAfter" stroke="#fb7185" strokeWidth={2} dot={false} connectNulls />
+                  <Line dataKey="average" type="stepAfter" stroke="#849198" strokeWidth={1.5} dot={false} connectNulls />
+                  <Line dataKey="fair" type="stepAfter" stroke="#fbbf24" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )) : chart.rows.length < 2 ? (
             <EmptyState>History starts when SharpStats first sees a price. Changes are recorded on every refresh.</EmptyState>
           ) : (
             <div className="h-[280px] w-full">
@@ -127,11 +168,9 @@ export function MovementView({ data, books, onOpen, loading }: { data: MovementD
         <Panel title="Sharp money tracker" subtitle={data.sharpReference ? `Moves led by ${books.find((book) => book.key === data.sharpReference)?.name ?? data.sharpReference}, the sharp reference market` : "Needs a sharp reference book (The Odds API key)"}>
           <SignalList rows={data.sharp} icon={<Zap size={13} className="text-violet-300" />} empty={data.sharpReference ? "No sharp-led moves in the current window." : "Sharp tracking compares soft books against Pinnacle, which requires ODDS_API_KEY."} onOpen={onOpen} />
         </Panel>
-        <Panel title="Public betting %" subtitle="Ticket and handle splits">
-          <div className="flex items-start gap-3 text-xs text-muted">
-            <Users size={16} className="mt-0.5 shrink-0 text-muted" />
-            <p className="leading-relaxed">Public ticket/handle percentages are not published by the connected odds providers, so SharpStats does not display them. Steam and sharp-led moves above are measured directly from price changes.</p>
-          </div>
+        <Panel title="Reverse line movement" subtitle="Estimated: lines moving toward the underdog or under since open">
+          <SignalList rows={data.reverse} icon={<Repeat size={13} className="text-sky-300" />} empty="No reverse line movement since the opening numbers." onOpen={onOpen} />
+          <p className="mt-3 text-[10px] leading-relaxed text-muted">The odds providers don't publish public ticket or handle percentages, so SharpStats treats the favorite and the over as the public side, which is where recreational money usually goes. A move of 2.5%+ implied (about a point) toward the other side, backed by most books, is flagged. Big moves can also come from injury or lineup news, so check the news before acting on one.</p>
         </Panel>
       </div>
       <Panel title="Biggest movers since open" subtitle="Average implied-probability change across books" flush>

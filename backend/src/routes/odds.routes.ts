@@ -31,6 +31,7 @@ router.get("/history", oddsController.history);
 router.get("/arbitrage", oddsController.arbitrage);
 router.get("/ev", oddsController.ev);
 router.get("/player-props", onDemandLimit, oddsController.playerProps);
+router.get("/props", onDemandLimit, oddsController.playerProps);
 router.get("/sportsbooks", oddsController.sportsbooks);
 router.get("/status", oddsController.status);
 router.get("/search", oddsController.search);

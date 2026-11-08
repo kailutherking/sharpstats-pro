@@ -9,6 +9,7 @@ export const ALERT_LABELS: Record<AlertType, string> = {
   line_move: "Line movement",
   steam: "Steam move",
   sharp: "Sharp action",
+  reverse_move: "Reverse line move",
   positive_ev: "Positive EV",
   arbitrage: "Arbitrage",
   best_price: "Best available price",

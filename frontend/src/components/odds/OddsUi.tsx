@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { ArrowDownRight, ArrowUpRight, Flame, Minus, Zap } from "lucide-react";
-import type { BookInfo, EvTier, RiskRating, SideSignals } from "../../lib/oddsTypes";
+import { ArrowDownRight, ArrowUpRight, Flame, Minus, Repeat, Zap } from "lucide-react";
+import type { BookInfo, Confidence, EvTier, RiskRating, SideSignals } from "../../lib/oddsTypes";
 import { bookShort, pct, TIER_LABELS } from "../../lib/oddsFormat";
 
 export function bookName(books: BookInfo[] | undefined, key: string): string {
@@ -32,11 +32,12 @@ export function MoveIndicator({ value, points }: { value: number | null; points?
 }
 
 export function SignalBadges({ signals }: { signals: SideSignals }) {
-  if (!signals.steam && !signals.sharp) return null;
+  if (!signals.steam && !signals.sharp && !signals.reverse) return null;
   return (
     <span className="inline-flex items-center gap-1">
       {signals.steam && <span title="Steam move: several books moved this side within minutes" className="inline-flex items-center gap-0.5 rounded-md bg-orange-400/10 px-1.5 py-0.5 text-[9px] font-bold text-orange-300"><Flame size={10} />STEAM</span>}
       {signals.sharp && <span title="Sharp action: the sharp reference market moved this side" className="inline-flex items-center gap-0.5 rounded-md bg-violet-400/10 px-1.5 py-0.5 text-[9px] font-bold text-violet-300"><Zap size={10} />SHARP</span>}
+      {signals.reverse && <span title="Reverse line movement (estimated): the line moved toward the underdog or under, the side the public usually avoids" className="inline-flex items-center gap-0.5 rounded-md bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-bold text-sky-300"><Repeat size={10} />RLM</span>}
     </span>
   );
 }
@@ -56,6 +57,17 @@ export function RiskBadge({ risk }: { risk: RiskRating | null }) {
   if (!risk) return <span className="text-muted">—</span>;
   const style = risk === "low" ? "text-lime" : risk === "medium" ? "text-amber-300" : "text-rose-400";
   return <span className={`text-[10px] font-semibold uppercase ${style}`}>{risk}</span>;
+}
+
+export function ConfidenceBadge({ confidence }: { confidence: Confidence | null | undefined }) {
+  if (!confidence) return <span className="text-muted">—</span>;
+  const style = confidence.label === "high" ? "text-lime" : confidence.label === "medium" ? "text-amber-300" : "text-rose-400";
+  return (
+    <span title={confidence.reasons.join(" · ")} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-[#1b2428]"><span className={`block h-full rounded-full ${confidence.label === "high" ? "bg-lime" : confidence.label === "medium" ? "bg-amber-300" : "bg-rose-400"}`} style={{ width: `${confidence.score}%` }} /></span>
+      <span className={`text-[10px] font-semibold tabular-nums ${style}`}>{confidence.score}</span>
+    </span>
+  );
 }
 
 export function LiveDot({ live }: { live: boolean }) {
