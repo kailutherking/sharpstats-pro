@@ -22,7 +22,7 @@ The Odds Screen (Research → Odds screen) is a real-time sportsbook market boar
 2. From the project root run `docker compose up --build`.
 3. Open [http://localhost:5173](http://localhost:5173).
 4. Sign in with `demo@sharpstats.pro` / `SharpStats123!`.
-5. API health check: [http://localhost:4000/api/health](http://localhost:4000/api/health).
+5. API health check: [http://localhost:4000/health](http://localhost:4000/health) (also at `/api/health`).
 
 The database schema, pending migrations (`backend/src/db/migrations`) and example sportsbooks are applied automatically on API startup; `npm run db:migrate --workspace backend` runs them on demand. The demo user and sample bets are created on the first successful API start. To reseed a fresh local database, run `docker compose down -v` and start it again (this removes local database data).
 
@@ -66,7 +66,7 @@ Copy `.env.example` to `.env`. Secrets stay in `.env`, which git ignores; never 
 | `DATABASE_URL` | local Postgres | PostgreSQL connection string |
 | `JWT_SECRET` | — | Access-token signing secret (24+ characters, unique per environment) |
 | `JWT_EXPIRES_IN` | `15m` | Access-token lifetime |
-| `PORT` / `CLIENT_ORIGIN` | `4000` / `http://localhost:5173` | API port and allowed browser origin |
+| `PORT` / `CLIENT_ORIGIN` | `4000` / `http://localhost:5173` | API port (hosts such as Railway set `PORT` automatically) and allowed browser origin |
 | `DEMO_EMAIL` / `DEMO_PASSWORD` | demo account | Local demo login; replace for deployments |
 | `ODDS_PROVIDER` | `auto` (`.env.example`: `theoddsapi`) | `theoddsapi` (primary), `espn` (keyless DraftKings only) or `auto` (The Odds API when a key is set). `theoddsapi` without a key falls back to ESPN and shows a warning |
 | `ODDS_API_KEY` | empty | The Odds API key; enables every sportsbook, period/alternate markets, props, EV and arbitrage |

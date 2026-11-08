@@ -1,5 +1,25 @@
 # Release notes
 
+## SharpStats Pro 1.4.1
+
+**Version:** 1.4.1
+**Release date:** 2026-11-08
+
+### Features added
+- **`GET /health` endpoint** for hosting health checks such as Railway. It returns `{ "status": "ok" }`. `/api/health` is unchanged.
+
+### Bug fixes
+- If `PORT` is empty or not a number, the API now uses port 4000 instead of failing to start. When the host assigns a port, the API uses it.
+
+### Performance improvements
+- None.
+
+### Breaking changes
+- None.
+
+### Known issues
+- `/health` responds only after database setup finishes on startup, so set the host's health-check timeout long enough for migrations to run.
+
 ## SharpStats Pro 1.4.0
 
 **Version:** 1.4.0

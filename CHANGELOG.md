@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-08
+
+### Added
+- `GET /health` returns `{ "status": "ok" }` for platform health checks such as Railway. `/api/health` still works.
+
+### Fixed
+- The API falls back to port 4000 when `PORT` is empty or not a number, instead of failing to start. Hosts like Railway that assign `PORT` work unchanged.
+
 ## [1.4.0] - 2026-11-08
 
 ### Added
@@ -92,7 +100,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Docker now serves the production frontend through Nginx and prunes development dependencies from the backend image.
 - Odds and analysis features are documented as quota-dependent, on-demand research rather than guaranteed predictions.
 
-[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/kailutherking/sharpstats-pro/compare/0398248...v1.2.0
