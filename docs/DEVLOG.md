@@ -2,6 +2,14 @@
 
 One entry per completed task, newest first. Commit hashes refer to the feature branch commit; see `git log` for merges.
 
+## 2026-11-08 — Railway port and /health endpoint (1.4.1)
+
+- **Feature:** Host-assigned port and a platform health check
+- **Description:** The API listens on `Number(process.env.PORT) || 4000`, so Railway's assigned port is used and an empty or invalid value falls back to 4000. Added `GET /health` returning `{ "status": "ok" }` (`/api/health` kept). Added a Railway section to the deployment guide. Verified by starting the server with `PORT=8080`: it logged "SharpStats API listening on 8080" and both health routes returned `{"status":"ok"}`.
+- **Files changed:** `backend/src/server.ts`, `backend/src/app.ts`, `backend/src/app.test.ts`, `README.md`, `docs/DEPLOYMENT.md`, `CHANGELOG.md`, `RELEASE_NOTES.md`, `package.json` ×3, `package-lock.json`
+- **Commit hash:** 3647a30
+- **Version:** 1.4.1
+
 ## 2026-11-08 — Credit pacing and pregame-only signals (1.4.0)
 
 - **Feature:** The Odds API credit pacing; signals and alerts limited to pregame markets
