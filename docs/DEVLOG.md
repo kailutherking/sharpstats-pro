@@ -2,6 +2,14 @@
 
 One entry per completed task, newest first. Commit hashes refer to the feature branch commit; see `git log` for merges.
 
+## 2026-11-08 — Multi-book odds aggregation upgrade (1.3.0)
+
+- **Feature:** Provider selection, reverse line movement, EV confidence, best/worst line history, versioned migrations
+- **Description:** Added `ODDS_PROVIDER` (theoddsapi/espn/auto), with an ESPN fallback and an on-screen warning when no key is set. Added estimated reverse line movement (signal, badge, panel and alerts), a 0–100 EV confidence rating, worst price per selection, and Edge/EV columns in the sportsbook comparison. Added a "Props only" filter, the `/api/odds/props` endpoint, and `odds_selection_history` with a best-vs-worst chart. Added versioned SQL migrations (`schema_migrations`, `npm run db:migrate`). Renamed the aggregator to `oddsAggregator.service.ts`. Verified live in keyless mode: NFL board, RLM flags, range history rows and the provider warning.
+- **Files changed:** 38. New: `backend/src/db/migrate.ts`, `backend/src/db/migrate.cli.ts`, `backend/src/db/migrations/001_odds_selection_history.sql`, `backend/src/services/oddsSignals.test.ts`, `frontend/public/favicon.svg`. Renamed: `odds.aggregate.service.ts` → `oddsAggregator.service.ts`. Modified: odds, line-movement, EV, alerts and props services; `server.ts`; odds routes; the Prisma schema; odds UI components and types; CI; docker-compose; `.env.example`; README, API and development docs; CHANGELOG; RELEASE_NOTES; the three `package.json` files.
+- **Commit hash:** 1df0d5c
+- **Version:** 1.3.0
+
 ## 2026-11-08 — Release tooling and project history
 
 - **Feature:** Release management (CI/CD, security automation, project history)
