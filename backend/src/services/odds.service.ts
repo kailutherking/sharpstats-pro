@@ -7,13 +7,13 @@ import {
   bookByKey, eventMarkets, featuredMarkets, getBooks, MARKETS, marketDef, ODDS_SPORTS, propMarkets, SPORT_CONFIG,
   type MarketCategory, type OddsSport,
 } from "./oddsCatalog";
-import { aggregate, lineIdentity, type ArbitrageOpportunity, type Selection } from "./odds.aggregate.service";
+import { aggregate, lineIdentity, type ArbitrageOpportunity, type Selection } from "./oddsAggregator.service";
 import {
-  KELLY_MULTIPLIER, MAX_STAKE_FRACTION, americanToDecimal, recentEvHistory, syncEvHistory, type EvSnapshot,
+  KELLY_MULTIPLIER, MAX_STAKE_FRACTION, americanToDecimal, confidenceRating, recentEvHistory, syncEvHistory, type EvSnapshot,
 } from "./evCalculator.service";
 import { arbitrageStakes, recentClosedArbitrage, syncArbitrage, type ArbitrageWithAge } from "./arbitrage.service";
 import {
-  lineIdOf, lineStates, listMovements, priceHistory, pruneHistory, recentMoveEvents, recordQuotes, signalsFor, type MoveEvent,
+  lineIdOf, lineStates, listMovements, priceHistory, pruneHistory, rangeHistory, recentMoveEvents, recordQuotes, recordSelectionRanges, signalsFor, type MoveEvent,
 } from "./lineMovement.service";
 import { buildAlerts, pruneAlerts, storeAlerts } from "./oddsAlerts.service";
 import { attachResearch, buildPropRows, type PropRow } from "./propResearch.service";
@@ -36,8 +36,28 @@ const THROTTLED_MS = 10 * 60_000;
 const RESEARCH_LIMIT = Math.max(0, Number(process.env.ODDS_PROP_RESEARCH_LIMIT ?? 60) || 0);
 const FIRST_LOAD_TIMEOUT_MS = 25_000;
 
+export type ProviderSetting = "auto" | "theoddsapi" | "espn";
+
+/** ODDS_PROVIDER: "theoddsapi" (primary, needs ODDS_API_KEY), "espn" (keyless DraftKings only) or "auto". */
+export function providerSetting(raw = process.env.ODDS_PROVIDER): ProviderSetting {
+  const value = (raw ?? "").trim().toLowerCase().replace(/[\s_-]/g, "");
+  if (value === "espn") return "espn";
+  if (value === "theoddsapi" || value === "oddsapi") return "theoddsapi";
+  return "auto";
+}
+
 export function providerMode(): OddsSource {
+  if (providerSetting() === "espn") return "espn";
   return oddsApiConfigured() ? "the-odds-api" : "espn";
+}
+
+/** Why the configured provider is not the one in use, if it is not. */
+function providerWarning(): string | null {
+  const raw = process.env.ODDS_PROVIDER?.trim();
+  if (raw && providerSetting(raw) === "auto" && raw.toLowerCase() !== "auto") return `ODDS_PROVIDER="${raw}" is not recognised; use theoddsapi, espn or auto.`;
+  if (providerSetting() === "theoddsapi" && !oddsApiConfigured()) return "ODDS_PROVIDER is theoddsapi but ODDS_API_KEY is empty. Showing DraftKings lines from ESPN until a key is set.";
+  if (providerSetting() === "espn" && oddsApiConfigured()) return "ODDS_PROVIDER=espn: ODDS_API_KEY is set but ignored, so only DraftKings lines are shown.";
+  return null;
 }
 
 function sharpBook(): string | null {
@@ -153,7 +173,9 @@ async function afterSnapshot(sport: OddsSport, quotes: RawQuote[], scope: string
       sideId: selection.id, sport, gameId: selection.gameId, market: selection.market, label: selection.label, book: price.book,
       american: price.american, fairProbability: selection.fair!.probability, ev: price.ev!, kelly: price.kelly ?? 0,
     })));
-  const [openedEv, arbitrageResult] = await Promise.all([syncEvHistory(sport, evRows), syncArbitrage(sport, computed.arbitrage)]);
+  const [openedEv, arbitrageResult] = await Promise.all([
+    syncEvHistory(sport, evRows), syncArbitrage(sport, computed.arbitrage), recordSelectionRanges(sport, computed.selections),
+  ]);
   computed.arbitrageWithAge = arbitrageResult.current;
   const alerts = await storeAlerts(buildAlerts({
     sport, games: st.games, selections: computed.selections, moves, openedArbitrage: arbitrageResult.opened, openedEv,
@@ -311,6 +333,8 @@ export interface ProviderStatus {
   unsupportedMarkets: string[];
   streamClients: number;
   notes: string[];
+  provider: ProviderSetting;
+  warning: string | null;
 }
 
 export function providerStatus(sport: OddsSport): ProviderStatus {
@@ -318,13 +342,17 @@ export function providerStatus(sport: OddsSport): ProviderStatus {
   const mode = providerMode();
   const interval = throttled() ? THROTTLED_MS : REFRESH_MS;
   const notes: string[] = [];
-  if (mode === "espn") notes.push("Keyless mode: DraftKings lines via ESPN. Add ODDS_API_KEY for every sportsbook, period markets, player props, no-vig EV and arbitrage.");
+  const warning = providerWarning();
+  if (warning) notes.push(warning);
+  if (mode === "espn" && providerSetting() !== "espn") notes.push("Keyless mode: DraftKings lines via ESPN. Add ODDS_API_KEY for every sportsbook, period markets, player props, no-vig EV and arbitrage.");
   if (throttled()) notes.push(`Provider credits are below ${LOW_CREDITS}; refreshes slowed to every 10 minutes.`);
   if (mode === "the-odds-api" && sharpBook()) notes.push(`Fair odds use ${bookByKey(sharpBook()!)?.name ?? sharpBook()} no-vig when it prices the main line, otherwise the consensus of every priced book.`);
   return {
     mode,
     label: mode === "the-odds-api" ? "The Odds API" : "ESPN odds feed (DraftKings)",
     configured: oddsApiConfigured(),
+    provider: providerSetting(),
+    warning,
     connected: Boolean(st.lastSuccessAt && !st.lastError && Date.now() - st.lastSuccessAt < Math.max(interval * 3, 120_000)),
     lastSuccessAt: st.lastSuccessAt ? new Date(st.lastSuccessAt).toISOString() : null,
     lastAttemptAt: st.lastAttemptAt ? new Date(st.lastAttemptAt).toISOString() : null,
@@ -542,6 +570,12 @@ export async function getEv(sport: OddsSport, options: { minEv: number; category
       kelly: price.kelly ?? 0,
       tier: price.ev! >= 0.06 ? "elite" : price.ev! >= 0.03 ? "strong" : "positive",
       risk: selection.risk,
+      confidence: confidenceRating({
+        ev: price.ev!, decimal: price.decimal, fairBooks: selection.fair!.books, sharpReference: selection.fair!.source === "sharp",
+        isProp: selection.category === "prop", booksAtLine: selection.books.filter((item) => item.priced && item.atLine).length,
+        priceAgeSeconds: price.bookUpdatedAt ? Math.max(0, (Date.now() - Date.parse(price.bookUpdatedAt)) / 1000) : null,
+        steam: selection.signals.steam,
+      }),
       marketAverage: selection.average?.american ?? null,
       bestPrice: price.isBest,
       lastChangeAt: price.lastChangeAt,
@@ -593,7 +627,7 @@ export async function getMovement(sport: OddsSport, filters: { gameId?: string; 
       probabilityMove: row.probabilityMove, pointMove: row.pointMove, signals: row.selection.signals,
       best: row.selection.best, books: row.selection.books.length,
     }));
-  const flagged = selections.filter((selection) => selection.signals.steam || selection.signals.sharp).map((selection) => ({
+  const flagged = selections.filter((selection) => selection.signals.steam || selection.signals.sharp || selection.signals.reverse).map((selection) => ({
     selectionId: selection.id, gameId: selection.gameId, label: selection.label, marketLabel: selection.marketLabel,
     game: st.games.get(selection.gameId) ? gameView(st.games.get(selection.gameId)!).label : "",
     signals: selection.signals, best: selection.best,
@@ -606,6 +640,7 @@ export async function getMovement(sport: OddsSport, filters: { gameId?: string; 
     movers,
     steam: flagged.filter((row) => row.signals.steam),
     sharp: flagged.filter((row) => row.signals.sharp),
+    reverse: flagged.filter((row) => row.signals.reverse),
     sharpReference: sharpBook(),
     movements: movements.map((move) => ({
       ...move,
@@ -617,12 +652,16 @@ export async function getMovement(sport: OddsSport, filters: { gameId?: string; 
 
 export async function getHistory(sport: OddsSport, sideId: string, book?: string) {
   const selection = compute(sport).selections.find((item) => item.id === sideId) ?? null;
-  const points = await priceHistory(sideId, book);
+  const [points, range] = await Promise.all([priceHistory(sideId, book), book ? Promise.resolve([]) : rangeHistory(sideId).catch(() => [])]);
   return {
     sport,
     sideId,
-    selection: selection ? { id: selection.id, label: selection.label, marketLabel: selection.marketLabel, gameId: selection.gameId, books: selection.books, fair: selection.fair, average: selection.average } : null,
+    selection: selection ? {
+      id: selection.id, label: selection.label, marketLabel: selection.marketLabel, gameId: selection.gameId, books: selection.books,
+      fair: selection.fair, average: selection.average, best: selection.best, worst: selection.worst, signals: selection.signals,
+    } : null,
     points,
+    range,
   };
 }
 

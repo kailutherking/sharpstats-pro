@@ -81,6 +81,37 @@ export function riskRating(input: { ev: number; decimal: number; fairBooks: numb
   return score >= 4 ? "high" : score >= 2 ? "medium" : "low";
 }
 
+export type ConfidenceLabel = "high" | "medium" | "low";
+export interface Confidence { score: number; label: ConfidenceLabel; reasons: string[] }
+
+/**
+ * How much to trust an EV figure, 0-100. Rewards a sharp reference price and broad agreement between
+ * books; penalises thin consensus, props, long odds, implausibly large edges and stale prices.
+ */
+export function confidenceRating(input: {
+  ev: number; decimal: number; fairBooks: number; sharpReference: boolean; isProp: boolean;
+  booksAtLine: number; priceAgeSeconds: number | null; steam?: boolean;
+}): Confidence {
+  let score = 50;
+  const reasons: string[] = [];
+  if (input.sharpReference) { score += 25; reasons.push("Sharp reference price"); }
+  else if (input.fairBooks >= 5) { score += 20; reasons.push(`${input.fairBooks}-book consensus`); }
+  else if (input.fairBooks >= 3) { score += 12; reasons.push(`${input.fairBooks}-book consensus`); }
+  else { score += 2; reasons.push("Thin consensus"); }
+  if (input.booksAtLine >= 5) score += 10;
+  else if (input.booksAtLine >= 3) score += 5;
+  if (input.isProp) { score -= 10; reasons.push("Player prop"); }
+  if (input.decimal >= 4) { score -= 15; reasons.push("Long odds"); }
+  else if (input.decimal >= 2.6) score -= 7;
+  if (input.ev >= 0.15) { score -= 15; reasons.push("Edge unusually large; check for a stale line"); }
+  else if (input.ev >= 0.08) score -= 7;
+  if (input.priceAgeSeconds !== null && input.priceAgeSeconds > 3600) { score -= 20; reasons.push("Price not updated for over an hour"); }
+  else if (input.priceAgeSeconds !== null && input.priceAgeSeconds > 900) { score -= 10; reasons.push("Price not updated for 15+ minutes"); }
+  if (input.steam) { score += 5; reasons.push("Steam on this side"); }
+  const clamped = Math.max(0, Math.min(100, Math.round(score)));
+  return { score: clamped, label: clamped >= 70 ? "high" : clamped >= 45 ? "medium" : "low", reasons };
+}
+
 export function average(values: number[]): number | null {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }

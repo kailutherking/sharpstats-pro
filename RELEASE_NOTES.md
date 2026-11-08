@@ -1,5 +1,36 @@
 # Release notes
 
+## SharpStats Pro 1.3.0
+
+**Version:** 1.3.0
+**Release date:** 2026-11-08
+
+### Features added
+- **Provider selection:** `ODDS_PROVIDER=theoddsapi` makes The Odds API the primary source for DraftKings, FanDuel, BetMGM, Caesars, ESPN BET, Fanatics, BetRivers, PrizePicks and Underdog, with Pinnacle as the sharp reference. Without a key, the screen falls back to ESPN's DraftKings lines and shows a clear warning.
+- **Line movement engine:** adds an estimated reverse line movement flag and alerts, alongside the existing steam moves, sharp-money indicators and biggest movers.
+- **+EV scanner:** each edge now has a confidence rating from 0 to 100, with the reasons it was scored that way.
+- **Line shopping:** worst price per selection; Edge and EV columns in the sportsbook comparison; a "Best vs worst" history chart with market average and fair value.
+- **Filters:** a "Props only" toggle.
+- **API:** `/api/odds/props` endpoint.
+- **Database:** versioned SQL migrations, starting with `odds_selection_history`.
+
+### Bug fixes
+- Fixed outdated Market Lab paths in the API docs.
+- Fixed the missing browser tab icon.
+
+### Performance improvements
+- Range history is written only when the best price, worst price or fair value changes, in batches of up to 500 rows.
+
+### Breaking changes
+- None. `/api/odds/player-props` still works alongside `/api/odds/props`.
+
+### Known issues
+- `ODDS_API_KEY` is still required for multi-book coverage. Without it, only DraftKings lines are available, and EV, arbitrage, props and the sharp reference stay inactive. The Odds API path is covered by fixture tests and has not been verified against a live key.
+- Reverse line movement is an estimate: no provider publishes public betting splits. Large moves can also come from injury or lineup news.
+- PointsBet remains retired (Fanatics, 2024). ESPN BET depends on The Odds API's coverage.
+
+Suggested commit message: `feat(odds): add provider selection, reverse line movement, EV confidence and best/worst line history`
+
 ## SharpStats Pro 1.2.0
 
 **Version:** 1.2.0

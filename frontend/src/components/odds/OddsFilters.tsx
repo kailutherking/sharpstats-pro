@@ -54,6 +54,7 @@ export function OddsFilters({ value, onChange, markets, books, keyless }: { valu
       <input aria-label="Game date" type="date" value={value.date} onChange={(event) => set({ date: event.target.value })} className={`${inputClass} text-muted`} />
       <Toggle label="+EV only" active={value.evOnly} onChange={(evOnly) => set({ evOnly })} />
       <Toggle label="Arbitrage only" active={value.arbOnly} onChange={(arbOnly) => set({ arbOnly })} />
+      {!keyless && <Toggle label="Props only" active={value.category === "prop"} onChange={(propsOnly) => set({ category: propsOnly ? "prop" : "game", market: "" })} />}
       <Toggle label="Live" active={value.live} onChange={(live) => set({ live })} />
       <Toggle label="Pregame" active={value.pregame} onChange={(pregame) => set({ pregame })} />
       {activeCount > 0 && <button type="button" onClick={() => onChange(EMPTY_ODDS_FILTERS)} className="px-2 text-[11px] font-semibold text-lime">Reset</button>}

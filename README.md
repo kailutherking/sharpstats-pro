@@ -6,7 +6,7 @@ The Market Lab adds multi-book no-vig market estimates, player-prop boards, EV a
 
 The Stats research center (Research → Stats) covers current-season NBA, NFL, MLB and NHL statistics: league leaders, sortable player and team tables, team records, home/away splits, offensive and defensive ranks, advanced team metrics, player profiles with game logs, splits, trend and history charts, prop hit-rate research, and auto-generated betting insights. It also includes CSV export, player/team comparison and favorites. Data comes from ESPN's public stats feeds and the MLB Stats API (no key required), is cached server-side, and refreshes every 15 minutes.
 
-The Odds Screen (Research → Odds screen) is a real-time sportsbook market board for NBA, NFL, MLB and NHL: line shopping across DraftKings, FanDuel, BetMGM, Caesars, ESPN BET, Fanatics, BetRivers, PrizePicks and Underdog; opening/current/peak prices with movement charts; steam and sharp-move detection; no-vig fair odds, +EV and arbitrage scanners; player prop hit rates; live alerts and a CLV tracker. Set `ODDS_API_KEY` ([The Odds API](https://the-odds-api.com)) for full multi-book coverage; without it, DraftKings game lines load from ESPN's public feed.
+The Odds Screen (Research → Odds screen) is a real-time sportsbook market board for NBA, NFL, MLB and NHL: line shopping across DraftKings, FanDuel, BetMGM, Caesars, ESPN BET, Fanatics, BetRivers, PrizePicks and Underdog; opening/current/peak prices and best/worst price with history charts; steam, sharp and (estimated) reverse line movement plus biggest movers; no-vig fair odds, +EV scanner with edge and a 0–100 confidence rating, arbitrage scanner; player prop hit rates; live alerts and a CLV tracker. Set `ODDS_API_KEY` ([The Odds API](https://the-odds-api.com)) for full multi-book coverage; without it, DraftKings game lines load from ESPN's public feed.
 
 > SharpStats Pro is an analytics tool, not financial advice or a guarantee of results. Validate all odds and wager information with your sportsbook. Bet responsibly.
 
@@ -24,11 +24,11 @@ The Odds Screen (Research → Odds screen) is a real-time sportsbook market boar
 4. Sign in with `demo@sharpstats.pro` / `SharpStats123!`.
 5. API health check: [http://localhost:4000/api/health](http://localhost:4000/api/health).
 
-The database schema and example sportsbooks are initialized and upgraded automatically on API startup. The demo user and sample bets are created on the first successful API start. To reseed a fresh local database, run `docker compose down -v` and start it again (this removes local database data).
+The database schema, pending migrations (`backend/src/db/migrations`) and example sportsbooks are applied automatically on API startup; `npm run db:migrate --workspace backend` runs them on demand. The demo user and sample bets are created on the first successful API start. To reseed a fresh local database, run `docker compose down -v` and start it again (this removes local database data).
 
 ## Start without Docker
 
-1. Create a PostgreSQL database and apply `backend/src/db/schema.sql`, then `backend/src/db/seed.sql`.
+1. Create a PostgreSQL database, run `npm run db:migrate --workspace backend` (with `DATABASE_URL` set), then apply `backend/src/db/seed.sql`.
 2. Copy `.env.example` to `.env` and set `DATABASE_URL`, a unique `JWT_SECRET` (at least 24 characters), and `CLIENT_ORIGIN`.
 3. Run `npm ci` from the root, `npm run prisma:generate --workspace backend`, then `npm run dev`.
 4. Visit the frontend at port 5173 and use the demo credentials above.
@@ -40,7 +40,7 @@ To test on a phone on the same Wi-Fi, set `VITE_API_URL` in the ignored `fronten
 ```text
 backend/
   src/
-    db/                 PostgreSQL schema and sportsbook seed data
+    db/                 PostgreSQL baseline schema, numbered migrations, migration runner and seed data
     controllers/        Request validation and response mapping (odds platform)
     middleware/         JWT auth and request error handling
     providers/          The Odds API, ESPN odds/stats, MLB Stats API and Sportradar adapters
@@ -68,6 +68,7 @@ Copy `.env.example` to `.env`. Secrets stay in `.env`, which git ignores; never 
 | `JWT_EXPIRES_IN` | `15m` | Access-token lifetime |
 | `PORT` / `CLIENT_ORIGIN` | `4000` / `http://localhost:5173` | API port and allowed browser origin |
 | `DEMO_EMAIL` / `DEMO_PASSWORD` | demo account | Local demo login; replace for deployments |
+| `ODDS_PROVIDER` | `auto` (`.env.example`: `theoddsapi`) | `theoddsapi` (primary), `espn` (keyless DraftKings only) or `auto` (The Odds API when a key is set). `theoddsapi` without a key falls back to ESPN and shows a warning |
 | `ODDS_API_KEY` | empty | The Odds API key; enables every sportsbook, period/alternate markets, props, EV and arbitrage |
 | `ODDS_REFRESH_SECONDS` | `30` | Refresh interval while the odds screen is open |
 | `ODDS_BACKGROUND_REFRESH_MINUTES` | `30` | Refresh interval with no viewers (`0` disables) |
@@ -96,7 +97,7 @@ All routes are prefixed with `/api`. Except for auth and health, requests requir
 - `GET|PUT /bankroll`
 - `GET /sportsbooks`, `GET /odds/model`, `GET /odds/risk`
 - Market Lab: `GET /odds/scan`, `GET /odds/snapshots`
-- Odds platform: `GET /odds`, `/odds/live`, `/odds/movement`, `/odds/arbitrage`, `/odds/ev`, `/odds/player-props`, `/odds/sportsbooks`, `/odds/history`, `/odds/game/:id`, `/odds/search`, `/odds/clv`, `/odds/status`, `/odds/stream` (Server-Sent Events), `POST /odds/refresh`, `GET|POST|PATCH|DELETE /odds/alerts/rules`, `GET /odds/alerts`, `GET|PUT /odds/favorites` (full table in [docs/API.md](./docs/API.md))
+- Odds platform: `GET /odds`, `/odds/live`, `/odds/movement`, `/odds/arbitrage`, `/odds/ev`, `/odds/props` (alias `/odds/player-props`), `/odds/sportsbooks`, `/odds/history`, `/odds/game/:id`, `/odds/search`, `/odds/clv`, `/odds/status`, `/odds/stream` (Server-Sent Events), `POST /odds/refresh`, `GET|POST|PATCH|DELETE /odds/alerts/rules`, `GET /odds/alerts`, `GET|PUT /odds/favorites` (full table in [docs/API.md](./docs/API.md))
 - `POST /bets/grade` (moneyline, spread, and total scores when supported provider results are available)
 - `GET|PUT /profile`
 - `GET /stats/:league` (`nba`, `nfl`, `mlb`, `nhl`), `POST /stats/:league/refresh`, `GET /stats/player/:id`, `GET /stats/team/:id`, `GET|PUT /stats/favorites`
@@ -111,5 +112,5 @@ The personal odds-calibration model is a regularized logistic regression trained
 - Access JWTs are held in browser local storage; rotating refresh tokens are hash-stored in PostgreSQL and delivered through HTTP-only, same-site cookies. For a public deployment, use TLS, review the browser token threat model, and add operational monitoring.
 - Bet result accepts `pending`, `win`, `loss`, and `push`. Profit/loss is calculated on the server from decimal odds and stake; entering a result updates the bankroll.
 - CSV import accepts rows with `sport`, `league`, `event`, `bet_type`, `team_player`, `odds`, `stake`, `sportsbook`, `date`, `result`, and `notes` headers. The importer validates each row and reports skipped rows.
-- Prisma 7 models core persistence and uses the PostgreSQL driver adapter; analytics and bet transactions retain parameterized PostgreSQL SQL. `backend/src/db/schema.sql` remains the current bootstrap/upgrade mechanism and must stay aligned with the Prisma schema.
+- Prisma 7 models core persistence and uses the PostgreSQL driver adapter; analytics and bet transactions retain parameterized PostgreSQL SQL. `backend/src/db/schema.sql` is the baseline; later changes are numbered migrations in `backend/src/db/migrations`. Both must stay aligned with the Prisma schema.
 - See [API documentation](./docs/API.md), [development guide](./docs/DEVELOPMENT.md), [deployment guide](./docs/DEPLOYMENT.md), [changelog](./CHANGELOG.md), and [release notes](./RELEASE_NOTES.md).

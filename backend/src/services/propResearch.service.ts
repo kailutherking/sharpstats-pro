@@ -1,7 +1,7 @@
 import type { ProviderGame } from "../providers/espnStats";
 import { getLeagueDirectory, getPlayerGames, type LeagueDirectory } from "./stats.service";
 import { marketDef, type OddsSport } from "./oddsCatalog";
-import type { BookPrice, Selection } from "./odds.aggregate.service";
+import type { BookPrice, Selection } from "./oddsAggregator.service";
 import type { OddsGame } from "./oddsTypes";
 
 /**

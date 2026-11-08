@@ -1,5 +1,5 @@
 import { pool } from "../db/pool";
-import type { ArbitrageOpportunity } from "./odds.aggregate.service";
+import type { ArbitrageOpportunity } from "./oddsAggregator.service";
 import type { OddsSport } from "./oddsCatalog";
 
 /**

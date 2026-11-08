@@ -37,8 +37,8 @@ Bet odds use decimal format. Results are `pending`, `win`, `loss`, and `push`. W
 | GET | `/analytics/summary` | Daily/weekly/monthly P/L, ROI, win rate, bankroll, CLV |
 | GET | `/analytics/performance` | Grouped league/sport/book/market performance and time series |
 | GET/PUT | `/bankroll` | Read/update starting bankroll and unit size |
-| GET | `/odds?sport=basketball_nba&includeProps=true` | Provider market prices, no-vig multi-book consensus, EV and arbitrage |
-| GET | `/odds/movement` | Per-user historical price snapshots |
+| GET | `/odds/scan?sport=basketball_nba&includeProps=true` | Market Lab: provider market prices, no-vig multi-book consensus, EV and arbitrage |
+| GET | `/odds/snapshots` | Market Lab: per-user historical price snapshots |
 | GET | `/odds/model` | Personal odds-calibration model status |
 | GET | `/odds/risk` | Open risk and capped portfolio budget |
 | GET | `/sportsbooks` | Books with user favorites |
@@ -73,16 +73,16 @@ All routes require a bearer token. `sport` is `nba`, `nfl`, `mlb` or `nhl` (defa
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/odds` | Market board: games, selections (every book's price with open/previous/peak/low, implied, no-vig fair, EV, Kelly, arbitrage, steam/sharp signals), dashboard metrics, markets, books, provider status and bankroll sizing. Filters: `category` (`game`, `period`, `team`, `alternate`, `prop`, `all`), `market`, `book`, `date` + `tzOffset`, `q`, `evOnly`, `arbOnly`, `live`, `pregame`, `gameId`, `limit`. |
+| GET | `/api/odds` | Market board: games, selections (every book's price with open/previous/peak/low, best and worst price, implied, no-vig fair, EV, edge, Kelly, confidence, arbitrage, steam/sharp/reverse-line-movement signals), dashboard metrics, markets, books, provider status and bankroll sizing. Filters: `category` (`game`, `period`, `team`, `alternate`, `prop`, `all`), `market`, `book`, `date` + `tzOffset`, `q`, `evOnly`, `arbOnly`, `live`, `pregame`, `gameId`, `limit`. |
 | GET | `/api/odds/live` | Board restricted to games in progress, plus moves from the last 15 minutes. |
 | GET | `/api/odds/game/:id` | Every market for one game (periods, team totals, alternates; `props=true` adds player props). |
-| GET | `/api/odds/movement` | Biggest movers since open, steam and sharp signals, and the 24h movement feed (`gameId`, `market`, `hours`). |
-| GET | `/api/odds/history` | Change-only price history for one selection (`sideId`, optional `book`). |
-| GET | `/api/odds/ev` | +EV prices with no-vig probability, fair odds, EV, edge, Kelly, risk and tier (`minEv` as a fraction, `market`, `book`), plus 24h EV history. |
+| GET | `/api/odds/movement` | Biggest movers since open, steam, sharp and (estimated) reverse line movement, and the 24h movement feed (`gameId`, `market`, `hours`). |
+| GET | `/api/odds/history` | Change-only price history for one selection by book (`sideId`, optional `book`), plus `range`: best/worst price, market average and fair value over time. |
+| GET | `/api/odds/ev` | +EV prices with no-vig probability, fair odds, EV, edge, Kelly, confidence (0–100 with reasons), risk and tier (`minEv` as a fraction, `market`, `book`), plus 24h EV history. |
 | GET | `/api/odds/arbitrage` | Open arbitrage with legs, stakes for `total`, guaranteed return and rating, plus recently closed windows. |
-| GET | `/api/odds/player-props` | Prop rows (best over/under, books, line move) with hit rates (L5, L10, season, home, away, vs opponent). Filters: `gameId`, `market`, `player`, `team`, `book`, `date`, `type` (`ou`/`yes`). |
+| GET | `/api/odds/props` (alias `/api/odds/player-props`) | Prop rows (best over/under, books, line move) with hit rates (L5, L10, season, home, away, vs opponent). Filters: `gameId`, `market`, `player`, `team`, `book`, `date`, `type` (`ou`/`yes`). |
 | GET | `/api/odds/sportsbooks` | Registry with connection status, favorites and per-sport provider status. |
-| GET | `/api/odds/status` | Provider status: mode, connection, last success/error, next refresh, credits remaining. |
+| GET | `/api/odds/status` | Provider status: active mode, `provider` setting (`ODDS_PROVIDER`), configuration `warning`, connection, last success/error, next refresh, credits remaining. |
 | GET | `/api/odds/search?q=` | Global search across games, teams, players, props, markets and sportsbooks. |
 | POST | `/api/odds/refresh` | Force a provider refresh (6 per minute). |
 | GET | `/api/odds/stream` | Server-Sent Events: `ready`, `update`, `alerts`, `heartbeat`. |
@@ -90,5 +90,9 @@ All routes require a bearer token. `sport` is `nba`, `nfl`, `mlb` or `nhl` (defa
 | POST / PATCH / DELETE | `/api/odds/alerts/rules[/:id]` | Create, pause/resume and delete custom alert rules. |
 | GET / PUT | `/api/odds/favorites` | Favorite markets, props and games. |
 | GET | `/api/odds/clv` | Closing line value for your bets (closing CLV and live CLV vs current fair price). |
+
+Provider: `ODDS_PROVIDER=theoddsapi` (primary; needs `ODDS_API_KEY`), `espn` (keyless DraftKings only) or `auto` (The Odds API when a key is set, otherwise ESPN). If `theoddsapi` is set without a key the server falls back to ESPN and `/status` returns a `warning`.
+
+Signals: steam = 3+ books moving the same side within 10 minutes; sharp = the reference book (Pinnacle) leads or joins the move; reverse line movement (estimated) = a 2.5%+ implied move (about a point) since open toward the underdog or under, backed by most books with history. Public ticket and handle percentages are not available from the providers, so the favorite and the over are treated as the public side.
 
 Refresh: the server polls the provider every `ODDS_REFRESH_SECONDS` (30) while any client has the screen open, otherwise every `ODDS_BACKGROUND_REFRESH_MINUTES` (30, `0` disables). Per-game markets and props are fetched on demand and cached for 2–3 minutes. When The Odds API credits fall below `ODDS_MIN_CREDITS`, refreshes slow to every 10 minutes.

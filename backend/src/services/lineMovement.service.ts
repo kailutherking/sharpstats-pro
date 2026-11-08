@@ -1,6 +1,6 @@
 import { pool } from "../db/pool";
 import { americanToDecimal } from "./evCalculator.service";
-import { lineId, lineIdentity, type LineState, type SideSignals } from "./odds.aggregate.service";
+import { lineId, lineIdentity, type LineState, type Selection, type SideSignals } from "./oddsAggregator.service";
 import { marketDef, type OddsSport } from "./oddsCatalog";
 import type { RawQuote } from "./oddsTypes";
 
@@ -258,14 +258,14 @@ export function signalsFor(sport: OddsSport, sharpBook: string | null, now = Dat
   }
   return (sideId: string) => {
     const moves = bySide.get(sideId) ?? [];
-    if (!moves.length) return { steam: false, sharp: false, moves: 0, lastMoveAt: null };
+    if (!moves.length) return { steam: false, sharp: false, reverse: false, moves: 0, lastMoveAt: null };
     const up = new Set(moves.filter((move) => move.direction > 0).map((move) => move.book));
     const down = new Set(moves.filter((move) => move.direction < 0).map((move) => move.book));
     const dominant = up.size >= down.size ? up : down;
     const steam = dominant.size >= STEAM_MIN_BOOKS;
     const sharpMoves = sharpBook ? moves.filter((move) => move.book === sharpBook) : [];
     const sharp = sharpMoves.some((move) => Math.abs(move.probabilityDelta) >= 0.02 || (dominant.has(move.book) && dominant.size >= 2));
-    return { steam, sharp, moves: moves.length, lastMoveAt: new Date(Math.max(...moves.map((move) => move.at))).toISOString() };
+    return { steam, sharp, reverse: false, moves: moves.length, lastMoveAt: new Date(Math.max(...moves.map((move) => move.at))).toISOString() };
   };
 }
 
@@ -331,8 +331,76 @@ export async function priceHistory(sideId: string, book?: string): Promise<Histo
   return result.rows.map((row) => ({ book: row.book_key, american: row.price_american, point: num(row.point), at: row.observed_at.toISOString() }));
 }
 
+/* ---------- Market range history (best / worst / average / fair per selection) ---------- */
+
+export interface RangePoint {
+  at: string;
+  bestAmerican: number;
+  bestBook: string;
+  worstAmerican: number | null;
+  worstBook: string | null;
+  averageImplied: number | null;
+  fairProbability: number | null;
+  books: number;
+}
+
+const lastRange = new Map<string, string>();
+
+function rangeSignature(selection: Selection): string {
+  const round = (value: number | null | undefined) => value === null || value === undefined ? "" : value.toFixed(3);
+  return [selection.best?.american, selection.best?.book, selection.worst?.american, selection.worst?.book, round(selection.average?.implied), round(selection.fair?.probability)].join("|");
+}
+
+/** Change-only snapshot of each selection's best and worst price, market average and fair value. */
+export async function recordSelectionRanges(sport: OddsSport, selections: Selection[], now = Date.now()): Promise<number> {
+  const changed = selections.filter((selection) => {
+    if (!selection.best) return false;
+    const signature = rangeSignature(selection);
+    if (lastRange.get(selection.id) === signature) return false;
+    lastRange.set(selection.id, signature);
+    return true;
+  });
+  if (!changed.length) return 0;
+  try {
+    for (let index = 0; index < changed.length; index += 500) {
+      const batch = changed.slice(index, index + 500);
+      await pool.query(
+        `INSERT INTO odds_selection_history
+           (side_id, sport, game_id, market_key, best_american, best_book, worst_american, worst_book, average_implied, fair_probability, books, recorded_at)
+         SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::int[], $6::text[], $7::int[], $8::text[], $9::numeric[], $10::numeric[], $11::int[], $12::timestamptz[])`,
+        [
+          batch.map((item) => item.id), batch.map(() => sport), batch.map((item) => item.gameId), batch.map((item) => item.market),
+          batch.map((item) => item.best!.american), batch.map((item) => item.best!.book),
+          batch.map((item) => item.worst?.american ?? null), batch.map((item) => item.worst?.book ?? null),
+          batch.map((item) => item.average?.implied ?? null), batch.map((item) => item.fair?.probability ?? null),
+          batch.map((item) => item.books.filter((price) => price.priced && price.atLine).length),
+          batch.map(() => new Date(now).toISOString()),
+        ],
+      );
+    }
+  } catch (error) {
+    for (const selection of changed) lastRange.delete(selection.id);
+    console.warn("Odds range history write failed", error instanceof Error ? error.message : error);
+    return 0;
+  }
+  return changed.length;
+}
+
+export async function rangeHistory(sideId: string, limit = 2000): Promise<RangePoint[]> {
+  const result = await pool.query<{ recorded_at: Date; best_american: number; best_book: string; worst_american: number | null; worst_book: string | null; average_implied: string | null; fair_probability: string | null; books: number }>(
+    `SELECT recorded_at, best_american, best_book, worst_american, worst_book, average_implied::text, fair_probability::text, books
+     FROM (SELECT * FROM odds_selection_history WHERE side_id = $1 ORDER BY recorded_at DESC LIMIT $2) recent ORDER BY recorded_at`,
+    [sideId, limit],
+  );
+  return result.rows.map((row) => ({
+    at: row.recorded_at.toISOString(), bestAmerican: row.best_american, bestBook: row.best_book, worstAmerican: row.worst_american, worstBook: row.worst_book,
+    averageImplied: row.average_implied === null ? null : Number(row.average_implied), fairProbability: row.fair_probability === null ? null : Number(row.fair_probability), books: row.books,
+  }));
+}
+
 export async function pruneHistory(): Promise<void> {
   const days = Math.max(1, Number(process.env.ODDS_HISTORY_DAYS ?? 14) || 14);
+  await pool.query("DELETE FROM odds_selection_history WHERE recorded_at < NOW() - make_interval(days => $1)", [days]);
   await pool.query("DELETE FROM odds_history WHERE observed_at < NOW() - make_interval(days => $1)", [days]);
   await pool.query("DELETE FROM odds_line_movements WHERE moved_at < NOW() - make_interval(days => $1)", [days]);
   await pool.query("DELETE FROM odds_lines WHERE last_seen_at < NOW() - make_interval(days => $1)", [days]);

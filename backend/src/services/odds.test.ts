@@ -1,14 +1,14 @@
 import {
   americanToDecimal, decimalToAmerican, evTier, expectedValue, kellyFraction, recommendedStake, removeVig, riskRating,
 } from "./evCalculator.service";
-import { aggregate, type SideSignals } from "./odds.aggregate.service";
+import { aggregate, type SideSignals } from "./oddsAggregator.service";
 import { arbitrageStakes } from "./arbitrage.service";
 import { moveScore } from "./lineMovement.service";
 import { buildPropRows, hitWindow, normalizeName, PROP_STATS, researchFromGames } from "./propResearch.service";
 import type { OddsGame, RawQuote } from "./oddsTypes";
 import type { ProviderGame } from "../providers/espnStats";
 
-const noSignals = (): SideSignals => ({ steam: false, sharp: false, moves: 0, lastMoveAt: null });
+const noSignals = (): SideSignals => ({ steam: false, sharp: false, reverse: false, moves: 0, lastMoveAt: null });
 
 const game: OddsGame = {
   id: "g1", sport: "nba", homeTeam: "Boston Celtics", awayTeam: "New York Knicks", homeAbbr: null, awayAbbr: null,

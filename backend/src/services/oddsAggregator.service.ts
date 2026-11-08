@@ -1,7 +1,7 @@
 import { bookByKey, isPricedBook, marketDef, type MarketDef, type OddsSport } from "./oddsCatalog";
 import {
-  americanToDecimal, average, evTier, expectedValue, kellyFraction, probabilityToAmerican, removeVig, riskRating,
-  type EvTier, type RiskRating,
+  americanToDecimal, average, confidenceRating, evTier, expectedValue, kellyFraction, probabilityToAmerican, removeVig, riskRating,
+  type Confidence, type EvTier, type RiskRating,
 } from "./evCalculator.service";
 import type { OddsGame, RawQuote } from "./oddsTypes";
 
@@ -23,6 +23,11 @@ export interface LineState {
 export interface SideSignals {
   steam: boolean;
   sharp: boolean;
+  /**
+   * Estimated reverse line movement: the line moved toward the side the public usually avoids
+   * (underdog or under). Ticket splits are not published by the providers, so this is a proxy.
+   */
+  reverse: boolean;
   moves: number;
   lastMoveAt: string | null;
 }
@@ -77,6 +82,8 @@ export interface Selection {
   label: string;
   books: BookPrice[];
   best: { book: string; american: number; decimal: number } | null;
+  /** Lowest comparable price on this side, for line-shopping spread. */
+  worst: { book: string; american: number; decimal: number } | null;
   average: { american: number | null; implied: number } | null;
   fair: FairValue | null;
   ev: number | null;
@@ -84,6 +91,7 @@ export interface Selection {
   kelly: number | null;
   tier: EvTier | null;
   risk: RiskRating | null;
+  confidence: Confidence | null;
   arbitrage: number | null;
   signals: SideSignals;
   updatedAt: string;
@@ -123,7 +131,57 @@ export interface AggregateInput {
   now?: number;
 }
 
-const NO_SIGNALS: SideSignals = { steam: false, sharp: false, moves: 0, lastMoveAt: null };
+const NO_SIGNALS: SideSignals = { steam: false, sharp: false, reverse: false, moves: 0, lastMoveAt: null };
+
+/** One point of spread/total is worth roughly three points of win probability in the major US sports. */
+const POINT_WEIGHT = 0.03;
+/** Minimum average move toward a side to call it reverse movement: 2.5% implied, or about one point of spread/total. */
+export const RLM_MIN_MOVE = 0.025;
+
+/** Market move toward one side since the open, averaged over books with history: price plus point change. */
+export function sideMarketMove(selection: Pick<Selection, "type" | "selection" | "books">): { move: number; books: number; toward: number } | null {
+  const moves = selection.books
+    .filter((price) => price.priced && price.atLine && price.open && price.probabilityMove !== null)
+    .map((price) => {
+      let pointEffect = 0;
+      if (price.open!.point !== null && price.point !== null) {
+        if (selection.type === "spread") pointEffect = price.open!.point - price.point;
+        else if (/^over$/i.test(selection.selection)) pointEffect = price.point - price.open!.point;
+        else if (/^under$/i.test(selection.selection)) pointEffect = price.open!.point - price.point;
+      }
+      return price.probabilityMove! + pointEffect * POINT_WEIGHT;
+    });
+  if (!moves.length) return null;
+  return { move: moves.reduce((sum, value) => sum + value, 0) / moves.length, books: moves.length, toward: moves.filter((value) => value > 0).length };
+}
+
+/**
+ * Which side of a two-way game market shows estimated reverse line movement. The public side is
+ * taken as the favorite (moneyline/spread) or the over (totals), the well-documented recreational
+ * bias; a meaningful move toward the other side, backed by most books with history, is flagged.
+ */
+export function reverseLineSide(sides: Array<Pick<Selection, "id" | "type" | "category" | "selection" | "point" | "books">>): string | null {
+  if (sides.length !== 2) return null;
+  const [a, b] = sides as [typeof sides[0], typeof sides[0]];
+  if (a.category !== "game" && a.category !== "period") return null;
+  let unpopular: typeof a | undefined;
+  if (a.type === "total") unpopular = sides.find((side) => /^under$/i.test(side.selection));
+  else if (a.type === "spread") {
+    const openPoint = (side: typeof a) => side.books.find((price) => price.atLine && price.open?.point != null)?.open?.point ?? side.point;
+    const pa = openPoint(a);
+    const pb = openPoint(b);
+    if (pa !== null && pb !== null && pa !== pb) unpopular = pa > pb ? a : b;
+  } else if (a.type === "moneyline") {
+    const openImplied = (side: typeof a) => average(side.books.filter((price) => price.priced && price.open).map((price) => 1 / americanToDecimal(price.open!.american)));
+    const ia = openImplied(a);
+    const ib = openImplied(b);
+    if (ia !== null && ib !== null && Math.abs(ia - ib) > 0.02) unpopular = ia < ib ? a : b;
+  }
+  if (!unpopular) return null;
+  const move = sideMarketMove(unpopular);
+  if (!move || move.move < RLM_MIN_MOVE) return null;
+  return move.toward >= Math.min(2, move.books) && move.toward * 2 > move.books ? unpopular.id : null;
+}
 
 export function signedPoint(point: number): string {
   if (point === 0) return "PK";
@@ -284,6 +342,7 @@ export function aggregate(input: AggregateInput): { selections: Selection[]; arb
 
       const comparable = books.filter((price) => price.priced && price.atLine && bookByKey(price.book)?.kind !== "reference");
       const bestPrice = comparable.reduce<BookPrice | null>((best, price) => !best || price.decimal > best.decimal ? price : best, null);
+      const worstPrice = comparable.length > 1 ? comparable.reduce<BookPrice | null>((worst, price) => !worst || price.decimal < worst.decimal ? price : worst, null) : null;
       if (bestPrice) for (const price of comparable) price.isBest = price.decimal === bestPrice.decimal;
       const averageImplied = average(comparable.map((price) => price.implied));
       const bestEv = bestPrice?.ev ?? null;
@@ -307,6 +366,7 @@ export function aggregate(input: AggregateInput): { selections: Selection[]; arb
         label: selectionLabel(def, side, participant, point),
         books,
         best: bestPrice ? { book: bestPrice.book, american: bestPrice.american, decimal: bestPrice.decimal } : null,
+        worst: worstPrice ? { book: worstPrice.book, american: worstPrice.american, decimal: worstPrice.decimal } : null,
         average: averageImplied === null ? null : { american: probabilityToAmerican(averageImplied), implied: averageImplied },
         fair,
         ev: bestEv,
@@ -316,11 +376,22 @@ export function aggregate(input: AggregateInput): { selections: Selection[]; arb
         risk: bestEv !== null && bestPrice
           ? riskRating({ ev: bestEv, decimal: bestPrice.decimal, fairBooks: fair!.books, isProp: def.category === "prop", sharpReference: fair!.source === "sharp" })
           : null,
+        confidence: bestEv !== null && bestPrice
+          ? confidenceRating({
+            ev: bestEv, decimal: bestPrice.decimal, fairBooks: fair!.books, sharpReference: fair!.source === "sharp",
+            isProp: def.category === "prop", booksAtLine: comparable.length,
+            priceAgeSeconds: bestPrice.bookUpdatedAt ? Math.max(0, (now - Date.parse(bestPrice.bookUpdatedAt)) / 1000) : null,
+            steam: input.signals(id)?.steam,
+          })
+          : null,
         arbitrage: null,
-        signals: input.signals(id) ?? NO_SIGNALS,
+        signals: { ...NO_SIGNALS, ...(input.signals(id) ?? {}) },
         updatedAt: latest || new Date(now).toISOString(),
       });
     }
+
+    const reverseId = reverseLineSide(sideSelections);
+    if (reverseId) for (const selection of sideSelections) if (selection.id === reverseId) selection.signals = { ...selection.signals, reverse: true };
 
     // Arbitrage: the best price on every side at the main line, across different priced books.
     if (sides.length >= 2 && sideSelections.every((selection) => selection.best)) {

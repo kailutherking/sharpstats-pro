@@ -50,7 +50,7 @@ jobs:
         run: npm run prisma:generate --workspace backend
       - name: Apply database schema
         run: |
-          PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/schema.sql
+          npm run db:migrate --workspace backend
           PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/seed.sql
       - name: Test
         run: npm test

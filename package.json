@@ -1,7 +1,7 @@
 {
   "name": "sharpstats-pro",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "scripts": {
     "dev": "concurrently -k -n api,web -c yellow,cyan \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
     "build": "npm run build --workspace backend && npm run build --workspace frontend",
