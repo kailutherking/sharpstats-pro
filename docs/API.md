@@ -95,4 +95,8 @@ Provider: `ODDS_PROVIDER=theoddsapi` (primary; needs `ODDS_API_KEY`), `espn` (ke
 
 Signals: steam = 3+ books moving the same side within 10 minutes; sharp = the reference book (Pinnacle) leads or joins the move; reverse line movement (estimated) = a 2.5%+ implied move (about a point) since open toward the underdog or under, backed by most books with history. Public ticket and handle percentages are not available from the providers, so the favorite and the over are treated as the public side.
 
+Credit pacing (`ODDS_CREDIT_PACING`, default on): automatic refreshes never run faster than the remaining credits, less a 20% reserve, can sustain until the next reset (`ODDS_CREDITS_RESET_DAY`). Viewed leagues get the budget first, and background refresh pauses when it can't be afforded. `/status` returns `pacing` (`intervalSeconds`, `resetAt`) when pacing is slower than `ODDS_REFRESH_SECONDS`. The last quota reading and refresh times are restored from `odds_refresh_log` on restart. Manual refresh always works.
+
+In-play games: prices still show, but steam, sharp and reverse-line-movement signals and all alerts are limited to games that haven't started, and EV confidence drops by 30 for live prices.
+
 Refresh: the server polls the provider every `ODDS_REFRESH_SECONDS` (30) while any client has the screen open, otherwise every `ODDS_BACKGROUND_REFRESH_MINUTES` (30, `0` disables). Per-game markets and props are fetched on demand and cached for 2–3 minutes. When The Odds API credits fall below `ODDS_MIN_CREDITS`, refreshes slow to every 10 minutes.

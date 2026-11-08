@@ -2,6 +2,14 @@
 
 One entry per completed task, newest first. Commit hashes refer to the feature branch commit; see `git log` for merges.
 
+## 2026-11-08 — Credit pacing and pregame-only signals (1.4.0)
+
+- **Feature:** The Odds API credit pacing; signals and alerts limited to pregame markets
+- **Description:** Connected the user's The Odds API key (free plan, 500 credits/month) and verified live: NFL and NBA boards with DraftKings, FanDuel, BetMGM, ESPN BET, BetRivers and Pinnacle. The default 30s/30min schedule would have used up the quota in about a day, so added credit pacing: viewed leagues first, background paused when unaffordable, a 20% reserve, and quota and refresh times restored on restart. Live NFL games produced most +EV, steam and alert noise, so signals and alerts now cover only games not yet started, and in-play confidence drops by 30. Found that The Odds API currently has no Caesars or Fanatics prices in the us/us2 regions.
+- **Files changed:** new `backend/src/services/creditPacing.ts` and `creditPacing.test.ts`; modified `odds.service.ts`, `oddsAggregator.service.ts`, `oddsAlerts.service.ts`, `evCalculator.service.ts`, `theOddsApi.ts`, `odds.routes.ts`, `oddsSignals.test.ts`, `frontend/src/lib/oddsTypes.ts`, `frontend/src/pages/OddsPage.tsx`, `.env.example`, `docker-compose.yml`, README, `docs/API.md`, CHANGELOG, RELEASE_NOTES, `package.json` ×3, `package-lock.json`
+- **Commit hash:** ee34145
+- **Version:** 1.4.0
+
 ## 2026-11-08 — Multi-book odds aggregation upgrade (1.3.0)
 
 - **Feature:** Provider selection, reverse line movement, EV confidence, best/worst line history, versioned migrations

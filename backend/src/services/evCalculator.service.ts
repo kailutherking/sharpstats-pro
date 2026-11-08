@@ -90,7 +90,7 @@ export interface Confidence { score: number; label: ConfidenceLabel; reasons: st
  */
 export function confidenceRating(input: {
   ev: number; decimal: number; fairBooks: number; sharpReference: boolean; isProp: boolean;
-  booksAtLine: number; priceAgeSeconds: number | null; steam?: boolean;
+  booksAtLine: number; priceAgeSeconds: number | null; steam?: boolean; live?: boolean;
 }): Confidence {
   let score = 50;
   const reasons: string[] = [];
@@ -107,6 +107,7 @@ export function confidenceRating(input: {
   else if (input.ev >= 0.08) score -= 7;
   if (input.priceAgeSeconds !== null && input.priceAgeSeconds > 3600) { score -= 20; reasons.push("Price not updated for over an hour"); }
   else if (input.priceAgeSeconds !== null && input.priceAgeSeconds > 900) { score -= 10; reasons.push("Price not updated for 15+ minutes"); }
+  if (input.live) { score -= 30; reasons.push("In-play: books update at different speeds, so most live gaps are delayed prices"); }
   if (input.steam) { score += 5; reasons.push("Steam on this side"); }
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   return { score: clamped, label: clamped >= 70 ? "high" : clamped >= 45 ? "medium" : "low", reasons };

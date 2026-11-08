@@ -12,7 +12,7 @@ const refreshLimit = rateLimit({
   limit: 6,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Refresh limit reached. Odds update automatically every 30 seconds." },
+  message: { error: "Refresh limit reached. Odds keep updating automatically; try again in a minute." },
 });
 
 /** Per-game and prop requests can trigger priced provider calls on a cache miss. */
