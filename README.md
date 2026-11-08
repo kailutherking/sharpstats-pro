@@ -4,6 +4,10 @@ A responsive sports betting research and bankroll management starter. It include
 
 The Market Lab adds multi-book no-vig market estimates, player-prop boards, EV and arbitrage scans, per-user odds calibration, manual line-history snapshots, fractional-Kelly portfolio caps, and provider-assisted grading. These research tools do not claim independent predictions or guaranteed opportunities when data is missing.
 
+The Stats research center (Research → Stats) covers current-season NBA, NFL, MLB and NHL statistics: league leaders, sortable player and team tables, team records, home/away splits, offensive and defensive ranks, advanced team metrics, player profiles with game logs, splits, trend and history charts, prop hit-rate research, and auto-generated betting insights. It also includes CSV export, player/team comparison and favorites. Data comes from ESPN's public stats feeds and the MLB Stats API (no key required), is cached server-side, and refreshes every 15 minutes.
+
+The Odds Screen (Research → Odds screen) is a real-time sportsbook market board for NBA, NFL, MLB and NHL: line shopping across DraftKings, FanDuel, BetMGM, Caesars, ESPN BET, Fanatics, BetRivers, PrizePicks and Underdog; opening/current/peak prices with movement charts; steam and sharp-move detection; no-vig fair odds, +EV and arbitrage scanners; player prop hit rates; live alerts and a CLV tracker. Set `ODDS_API_KEY` ([The Odds API](https://the-odds-api.com)) for full multi-book coverage; without it, DraftKings game lines load from ESPN's public feed.
+
 > SharpStats Pro is an analytics tool, not financial advice or a guarantee of results. Validate all odds and wager information with your sportsbook. Bet responsibly.
 
 ## Requirements
@@ -37,20 +41,50 @@ To test on a phone on the same Wi-Fi, set `VITE_API_URL` in the ignored `fronten
 backend/
   src/
     db/                 PostgreSQL schema and sportsbook seed data
+    controllers/        Request validation and response mapping (odds platform)
     middleware/         JWT auth and request error handling
-    providers/          The Odds API and Sportradar adapter examples
-    routes/             Auth, bets, analytics, bankroll, odds, profile
-    services/           Demo account seeding and application logic
+    providers/          The Odds API, ESPN odds/stats, MLB Stats API and Sportradar adapters
+    routes/             Auth, bets, analytics, bankroll, odds, stats, profile
+    services/           Odds aggregation, line movement, EV, arbitrage, alerts, stats and app logic
     app.ts              Express application and route wiring
     server.ts           Process startup and graceful shutdown
 frontend/
   src/
-    components/         Shared layout, cards, and charts
-    lib/                API client and typed models
-    pages/              Dashboard and product workspaces
+    components/         Shared layout, cards and charts; odds/ and stats/ feature components
+    lib/                API client, typed models, formatters and the live odds stream hook
+    pages/              Odds and Stats workspaces
     App.tsx             Auth gate and app navigation
     index.css           Tailwind theme and global styles
 ```
+
+## Environment variables
+
+Copy `.env.example` to `.env`. Secrets stay in `.env`, which git ignores; never commit real keys.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | local Postgres | PostgreSQL connection string |
+| `JWT_SECRET` | — | Access-token signing secret (24+ characters, unique per environment) |
+| `JWT_EXPIRES_IN` | `15m` | Access-token lifetime |
+| `PORT` / `CLIENT_ORIGIN` | `4000` / `http://localhost:5173` | API port and allowed browser origin |
+| `DEMO_EMAIL` / `DEMO_PASSWORD` | demo account | Local demo login; replace for deployments |
+| `ODDS_API_KEY` | empty | The Odds API key; enables every sportsbook, period/alternate markets, props, EV and arbitrage |
+| `ODDS_REFRESH_SECONDS` | `30` | Refresh interval while the odds screen is open |
+| `ODDS_BACKGROUND_REFRESH_MINUTES` | `30` | Refresh interval with no viewers (`0` disables) |
+| `ODDS_SHARP_BOOK` | `pinnacle` | Reference book for fair prices and sharp moves |
+| `ODDS_MIN_CREDITS` | `250` | Below this many provider credits, refreshes slow to every 10 minutes |
+| `ODDS_EXTRA_BOOKS` | empty | Extra books as `key\|Name\|kind`, comma-separated |
+| `SPORTRADAR_API_KEY` | empty | Sportradar schedule adapter example |
+| `STATS_REFRESH_MINUTES` / `STATS_AUTO_REFRESH` | `15` / `true` | Stats cache refresh |
+| `STATS_PROVIDER_TIMEOUT_MS` | `20000` | Stats provider request timeout |
+| `VITE_API_URL` | current host | Frontend API base URL (build time) |
+
+## Development workflow
+
+- Branches: `main` is production, `develop` is active development, and work happens on `feature/*` or `fix/*` branches merged into `develop`.
+- Checks: `npm run lint`, `npm run typecheck`, `npm test` and `npm run build` from the root. CI runs all of them, plus Docker image builds and `npm audit`, on every push and pull request.
+- Releases follow [Semantic Versioning](https://semver.org). Update `CHANGELOG.md`, `RELEASE_NOTES.md` and `docs/DEVLOG.md`, merge `develop` into `main`, then push a `vX.Y.Z` tag that matches `package.json`. The release workflow publishes the GitHub release and versioned images to GitHub Container Registry.
+- GitHub automation: `ci.yml`, `deploy.yml` (publishes images on `main`; set the `DEPLOY_WEBHOOK_URL` secret and `VITE_API_URL` variable to deploy), `release.yml`, `codeql.yml` and Dependabot (weekly npm, Actions and Docker updates against `develop`).
 
 ## Main API
 
@@ -60,9 +94,12 @@ All routes are prefixed with `/api`. Except for auth and health, requests requir
 - `GET|POST /bets`, `GET|PATCH|DELETE /bets/:id`, `POST /bets/import`, `GET /bets/export`
 - `GET /analytics/summary`, `GET /analytics/performance`
 - `GET|PUT /bankroll`
-- `GET /sportsbooks`, `GET /odds`, `GET /odds/movement`, `GET /odds/model`, `GET /odds/risk`
+- `GET /sportsbooks`, `GET /odds/model`, `GET /odds/risk`
+- Market Lab: `GET /odds/scan`, `GET /odds/snapshots`
+- Odds platform: `GET /odds`, `/odds/live`, `/odds/movement`, `/odds/arbitrage`, `/odds/ev`, `/odds/player-props`, `/odds/sportsbooks`, `/odds/history`, `/odds/game/:id`, `/odds/search`, `/odds/clv`, `/odds/status`, `/odds/stream` (Server-Sent Events), `POST /odds/refresh`, `GET|POST|PATCH|DELETE /odds/alerts/rules`, `GET /odds/alerts`, `GET|PUT /odds/favorites` (full table in [docs/API.md](./docs/API.md))
 - `POST /bets/grade` (moneyline, spread, and total scores when supported provider results are available)
 - `GET|PUT /profile`
+- `GET /stats/:league` (`nba`, `nfl`, `mlb`, `nhl`), `POST /stats/:league/refresh`, `GET /stats/player/:id`, `GET /stats/team/:id`, `GET|PUT /stats/favorites`
 
 The Market Lab normalizes The Odds API prices across books, calculates no-vig consensus probabilities, identifies positive expected value and theoretical arbitrage, and records line snapshots for movement comparisons. Line movement history accrues on explicit scans (up to six scans per minute; snapshots are retained for 30 days). Player props are optional because provider market availability and API quotas vary. Configure `ODDS_API_KEY` in `.env` for current odds, historical snapshots, and supported score-based grading. Configure `SPORTRADAR_API_KEY` for the separate Sportradar schedule adapter example. Provider requests are made server-side so keys are not exposed in the browser. Review each provider's API plan, terms, and rate limits before use.
 

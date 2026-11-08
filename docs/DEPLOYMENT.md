@@ -11,7 +11,10 @@ For production, set `NODE_ENV=production`, terminate TLS at a trusted reverse pr
 
 ## CI/CD
 
-GitHub Actions runs tests, Prisma client generation, type checks, production builds, and dependency audit for pushes to `main` and pull requests. Add deployment credentials as repository secrets and create a separately reviewed deployment job for your hosting provider.
+- `ci.yml` runs on pushes to `main`, `develop`, `feature/**` and `fix/**`, and on pull requests: lint, Prisma generation, schema apply, tests, type checks, backend and frontend builds, `npm audit --audit-level=high`, and Docker image builds.
+- `deploy.yml` runs on `main`: it reruns CI, then publishes `ghcr.io/<owner>/<repo>-backend` and `-frontend` images tagged `latest` and `sha-<commit>`. Set the `VITE_API_URL` repository variable to the public API URL, and the `DEPLOY_WEBHOOK_URL` secret to have your host pull the new images. The job uses the `production` environment, so you can require approval in repository settings.
+- `release.yml` runs on `vX.Y.Z` tags: it checks the tag matches `package.json`, creates a GitHub release from that version's `CHANGELOG.md` section, and publishes versioned images.
+- `codeql.yml` runs security analysis on `main`/`develop` and weekly; Dependabot opens weekly dependency PRs against `develop`.
 
 ## Operational limitations
 

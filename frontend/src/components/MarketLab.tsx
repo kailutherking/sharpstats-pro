@@ -40,8 +40,8 @@ export function MarketLab({ onTrack, onGraded }: { onTrack: (bet: Partial<Bet>) 
     setError("");
     try {
       const [marketData, movementData, riskData, modelData] = await Promise.all([
-        api.odds(sport, includeProps),
-        api.oddsMovement(),
+        api.marketScan(sport, includeProps),
+        api.marketSnapshots(),
         api.oddsRisk(),
         api.oddsModel(),
       ]);
