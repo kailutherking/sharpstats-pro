@@ -2,8 +2,8 @@ import request from "supertest";
 import { app } from "./app";
 
 describe("HTTP API", () => {
-  it("exposes a health check", async () => {
-    await request(app).get("/api/health").expect(200, { status: "ok" });
+  it.each(["/health", "/api/health"])("exposes a health check at %s", async (path) => {
+    await request(app).get(path).expect(200, { status: "ok" });
   });
 
   it("protects private routes without access tokens", async () => {
