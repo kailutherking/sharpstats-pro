@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Star } from "lucide-react";
 import type { BookInfo, OddsGame, Selection, SportsbookRow } from "../../lib/oddsTypes";
-import { american, bookShort, pct, priceLine, startTime } from "../../lib/oddsFormat";
+import { american, bookShort, pct, priceLine, signedPct, startTime } from "../../lib/oddsFormat";
 import { EmptyState, thClass } from "../stats/StatsUi";
 import { LiveDot, MoveIndicator, SignalBadges } from "./OddsUi";
 
@@ -63,7 +63,7 @@ export function BookComparison({ selections, games, books, sportsbooks, onToggle
       )}
       {!selections.length ? <EmptyState>No markets match these filters.</EmptyState> : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left" style={{ minWidth: 380 + columns.length * 84 }}>
+          <table className="w-full text-left" style={{ minWidth: 520 + columns.length * 84 }}>
             <thead>
               <tr className={thClass}>
                 <th className="sticky left-0 z-10 bg-panel px-4 py-3">SELECTION</th>
@@ -76,7 +76,9 @@ export function BookComparison({ selections, games, books, sportsbooks, onToggle
                 ))}
                 <th className="px-3 py-3 text-right">MKT AVG</th>
                 <th className="px-3 py-3 text-right">FAIR</th>
-                <th className="px-4 py-3 text-right">BEST</th>
+                <th className="px-3 py-3 text-right">BEST</th>
+                <th className="px-3 py-3 text-right" title="Fair probability minus the best price's implied probability">EDGE</th>
+                <th className="px-4 py-3 text-right" title="Expected value of the best price vs the no-vig fair line">EV</th>
               </tr>
             </thead>
             <tbody>
@@ -87,7 +89,7 @@ export function BookComparison({ selections, games, books, sportsbooks, onToggle
                   <Fragment key={gameId}>
                     {groupByGame && (
                       <tr className="border-t border-line bg-[#0e1416]">
-                        <td colSpan={columns.length + 4} className="px-4 py-2">
+                        <td colSpan={columns.length + 6} className="px-4 py-2">
                           <button type="button" onClick={() => onGame?.(gameId)} className="flex items-center gap-2 text-left text-[11px] font-semibold text-white hover:text-lime">
                             {game?.label ?? gameId}<LiveDot live={game?.status === "live"} />
                             <span className="font-normal text-muted">{game ? startTime(game.commenceTime) : ""}</span>
@@ -123,7 +125,9 @@ export function BookComparison({ selections, games, books, sportsbooks, onToggle
                           })}
                           <td className="px-3 py-2.5 text-right tabular-nums text-[#d9e0dc]">{american(selection.average?.american)}</td>
                           <td className="px-3 py-2.5 text-right tabular-nums text-[#d9e0dc]" title={selection.fair?.sourceLabel}>{american(selection.fair?.american)}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-lime">{selection.best ? `${american(selection.best.american)} ${bookShort(selection.best.book)}` : "—"}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-lime" title={selection.worst ? `Worst: ${american(selection.worst.american)} ${bookShort(selection.worst.book)}` : undefined}>{selection.best ? `${american(selection.best.american)} ${bookShort(selection.best.book)}` : "—"}</td>
+                          <td className={`px-3 py-2.5 text-right tabular-nums ${selection.edge === null ? "text-muted" : selection.edge > 0 ? "text-lime" : "text-[#d9e0dc]"}`}>{signedPct(selection.edge)}</td>
+                          <td className={`px-4 py-2.5 text-right tabular-nums font-semibold ${selection.ev === null ? "text-muted" : selection.ev > 0 ? "text-lime" : "text-rose-400"}`}>{signedPct(selection.ev)}</td>
                         </tr>
                       );
                     })}

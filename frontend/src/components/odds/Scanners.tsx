@@ -3,7 +3,7 @@ import { Scale, ShieldCheck } from "lucide-react";
 import type { ArbitrageData, BookInfo, EvData, EvTier } from "../../lib/oddsTypes";
 import { american, money, pct, recommendedStake, signedPct, startTime, timeAgo } from "../../lib/oddsFormat";
 import { EmptyState, inputClass, LoadingBlock, Panel, Segmented, thClass } from "../stats/StatsUi";
-import { BookTag, LiveDot, Notice, RiskBadge, SignalBadges, TierBadge } from "./OddsUi";
+import { BookTag, ConfidenceBadge, LiveDot, Notice, RiskBadge, SignalBadges, TierBadge } from "./OddsUi";
 
 function KeyNotice({ keyless }: { keyless: boolean }) {
   if (!keyless) return null;
@@ -32,12 +32,12 @@ export function EvScanner({ data, books, loading, keyless, onOpen }: { data: EvD
         action={<label className="flex items-center gap-2 text-[11px] text-muted">Min EV %<input aria-label="Minimum EV percent" type="number" step="0.5" min="0" value={minEv} onChange={(event) => setMinEv(event.target.value)} className={`${inputClass} w-20`} /></label>}>
         {!rows.length ? <EmptyState>{keyless ? "EV scanning activates with multi-book prices." : "No prices currently beat the fair line at this threshold."}</EmptyState> : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1280px] text-left">
+            <table className="w-full min-w-[1360px] text-left">
               <thead><tr className={thClass}>
                 <th className="px-4 py-3">SELECTION</th><th className="px-3 py-3">GAME</th><th className="px-3 py-3">BOOK</th><th className="px-3 py-3 text-right">ODDS</th>
                 <th className="px-3 py-3 text-right">IMPLIED</th><th className="px-3 py-3 text-right">NO-VIG</th><th className="px-3 py-3 text-right">FAIR ODDS</th>
                 <th className="px-3 py-3 text-right">EV</th><th className="px-3 py-3 text-right">EDGE</th><th className="px-3 py-3 text-right">KELLY</th><th className="px-3 py-3 text-right">STAKE</th>
-                <th className="px-3 py-3">RISK</th><th className="px-4 py-3">RATING</th>
+                <th className="px-3 py-3" title="0-100: sharp reference, book agreement, price freshness, odds length">CONFIDENCE</th><th className="px-3 py-3">RISK</th><th className="px-4 py-3">RATING</th>
               </tr></thead>
               <tbody>
                 {rows.map((row) => {
@@ -55,6 +55,7 @@ export function EvScanner({ data, books, loading, keyless, onOpen }: { data: EvD
                       <td className="px-3 py-2.5 text-right tabular-nums text-[#d9e0dc]">{signedPct(row.edge)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-[#d9e0dc]">{data ? pct(Math.min(data.sizing.maxStakeFraction, row.kelly * data.sizing.kellyMultiplier), 2) : "—"}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-white">{stake ? money(stake) : "—"}</td>
+                      <td className="px-3 py-2.5"><ConfidenceBadge confidence={row.confidence} /></td>
                       <td className="px-3 py-2.5"><RiskBadge risk={row.risk} /></td>
                       <td className="px-4 py-2.5"><TierBadge tier={row.tier} /></td>
                     </tr>

@@ -95,7 +95,7 @@ export function PropResearch({ data, loading, filters, onFilters, books, favorit
                               </span>
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-[#d9e0dc]"><span className="flex items-center gap-1.5">{row.marketLabel}<TierBadge tier={row.over?.tier ?? row.under?.tier ?? null} /><SignalBadges signals={row.over?.signals ?? row.under?.signals ?? { steam: false, sharp: false, moves: 0, lastMoveAt: null }} /></span></td>
+                          <td className="px-3 py-2.5 text-[#d9e0dc]"><span className="flex items-center gap-1.5">{row.marketLabel}<TierBadge tier={row.over?.tier ?? row.under?.tier ?? null} /><SignalBadges signals={row.over?.signals ?? row.under?.signals ?? { steam: false, sharp: false, reverse: false, moves: 0, lastMoveAt: null }} /></span></td>
                           <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-white">{row.type === "prop_yes" ? "Yes" : row.line ?? "—"}</td>
                           <td className="px-3 py-2.5 text-right"><Side side={row.over} books={books} /></td>
                           <td className="px-3 py-2.5 text-right"><Side side={row.under} books={books} /></td>

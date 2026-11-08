@@ -1,10 +1,10 @@
 import { pool } from "../db/pool";
 import { bookByKey, type OddsSport } from "./oddsCatalog";
-import type { ArbitrageOpportunity, Selection } from "./odds.aggregate.service";
+import type { ArbitrageOpportunity, Selection } from "./oddsAggregator.service";
 import type { MoveEvent } from "./lineMovement.service";
 import type { OddsGame } from "./oddsTypes";
 
-export const ALERT_TYPES = ["line_move", "steam", "sharp", "positive_ev", "arbitrage", "best_price", "clv"] as const;
+export const ALERT_TYPES = ["line_move", "steam", "sharp", "reverse_move", "positive_ev", "arbitrage", "best_price", "clv"] as const;
 export type AlertType = typeof ALERT_TYPES[number];
 
 export interface OddsAlert {
@@ -35,7 +35,7 @@ export const ALERT_THRESHOLDS = {
 };
 
 const DEDUPE_BUCKET_MS = 30 * 60_000;
-const previous = new Map<OddsSport, { steam: Set<string>; sharp: Set<string>; best: Map<string, string>; clv: Set<string> }>();
+const previous = new Map<OddsSport, { steam: Set<string>; sharp: Set<string>; reverse: Set<string>; best: Map<string, string>; clv: Set<string> }>();
 
 function american(value: number): string {
   return value > 0 ? `+${value}` : String(value);
@@ -64,7 +64,7 @@ export function buildAlerts(input: {
 }): Draft[] {
   const now = input.now ?? Date.now();
   const bucket = Math.floor(now / DEDUPE_BUCKET_MS);
-  const state = previous.get(input.sport) ?? { steam: new Set<string>(), sharp: new Set<string>(), best: new Map<string, string>(), clv: new Set<string>() };
+  const state = previous.get(input.sport) ?? { steam: new Set<string>(), sharp: new Set<string>(), reverse: new Set<string>(), best: new Map<string, string>(), clv: new Set<string>() };
   const firstRun = !previous.has(input.sport);
   const drafts: Draft[] = [];
   const bySide = new Map(input.selections.map((selection) => [selection.id, selection]));
@@ -104,6 +104,7 @@ export function buildAlerts(input: {
 
   const steam = new Set<string>();
   const sharp = new Set<string>();
+  const reverse = new Set<string>();
   const clv = new Set<string>();
   for (const selection of input.selections) {
     if (selection.signals.steam) {
@@ -122,6 +123,15 @@ export function buildAlerts(input: {
         title: `Sharp action · ${selection.label}`,
         message: "The sharp reference market moved on this side; recreational books may follow.",
         severity: "high", value: null, signature: `sharp|${selection.id}|${bucket}`,
+      });
+    }
+    if (selection.signals.reverse) {
+      reverse.add(selection.id);
+      if (!state.reverse.has(selection.id)) drafts.push({
+        ...base(selection, selection.gameId), type: "reverse_move", book: null,
+        title: `Reverse line move · ${selection.label}`,
+        message: "The line moved toward the side the public usually avoids (underdog or under), an estimated sign of sharp money.",
+        severity: "notice", value: null, signature: `reverse_move|${selection.id}|${bucket}`,
       });
     }
     const bestPrice = selection.best;
@@ -174,7 +184,7 @@ export function buildAlerts(input: {
   }
 
   previous.set(input.sport, {
-    steam, sharp, clv,
+    steam, sharp, reverse, clv,
     best: new Map(input.selections.filter((selection) => selection.best).map((selection) => [selection.id, selection.best!.book])),
   });
   // The first snapshot after a restart only establishes the baseline for change-based alerts.

@@ -237,6 +237,36 @@ model OddsHistory {
   @@map("odds_history")
 }
 
+/// Applied by src/db/migrations/001_odds_selection_history.sql.
+model OddsSelectionHistory {
+  id              BigInt   @id @default(autoincrement())
+  sideId          String   @map("side_id")
+  sport           String   @db.VarChar(8)
+  gameId          String   @map("game_id") @db.VarChar(100)
+  marketKey       String   @map("market_key") @db.VarChar(60)
+  bestAmerican    Int      @map("best_american")
+  bestBook        String   @map("best_book") @db.VarChar(40)
+  worstAmerican   Int?     @map("worst_american")
+  worstBook       String?  @map("worst_book") @db.VarChar(40)
+  averageImplied  Decimal? @map("average_implied") @db.Decimal(8, 5)
+  fairProbability Decimal? @map("fair_probability") @db.Decimal(8, 5)
+  books           Int      @default(0)
+  recordedAt      DateTime @default(now()) @map("recorded_at") @db.Timestamptz
+
+  @@index([sideId, recordedAt])
+  @@index([recordedAt])
+  @@map("odds_selection_history")
+}
+
+model SchemaMigration {
+  version   String   @id @db.VarChar(20)
+  name      String   @db.VarChar(200)
+  checksum  String   @db.Char(64)
+  appliedAt DateTime @default(now()) @map("applied_at") @db.Timestamptz
+
+  @@map("schema_migrations")
+}
+
 model OddsLineMovement {
   id               BigInt   @id @default(autoincrement())
   sideId           String   @map("side_id")

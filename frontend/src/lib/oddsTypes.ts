@@ -20,7 +20,10 @@ export interface OddsGame {
   label: string;
 }
 
-export interface SideSignals { steam: boolean; sharp: boolean; moves: number; lastMoveAt: string | null }
+/** reverse = estimated reverse line movement (line moved toward the underdog or under). */
+export interface SideSignals { steam: boolean; sharp: boolean; reverse: boolean; moves: number; lastMoveAt: string | null }
+
+export interface Confidence { score: number; label: "high" | "medium" | "low"; reasons: string[] }
 
 export interface BookPrice {
   book: string;
@@ -64,6 +67,7 @@ export interface Selection {
   label: string;
   books: BookPrice[];
   best: { book: string; american: number; decimal: number } | null;
+  worst: { book: string; american: number; decimal: number } | null;
   average: { american: number | null; implied: number } | null;
   fair: FairValue | null;
   ev: number | null;
@@ -71,6 +75,7 @@ export interface Selection {
   kelly: number | null;
   tier: EvTier | null;
   risk: RiskRating | null;
+  confidence: Confidence | null;
   arbitrage: number | null;
   signals: SideSignals;
   updatedAt: string;
@@ -91,6 +96,8 @@ export interface ProviderStatus {
   unsupportedMarkets: string[];
   streamClients: number;
   notes: string[];
+  provider: "auto" | "theoddsapi" | "espn";
+  warning: string | null;
 }
 
 export interface BookInfo {
@@ -159,6 +166,7 @@ export interface MovementData {
   movers: Array<{ selectionId: string; gameId: string; label: string; marketLabel: string; game: string; probabilityMove: number | null; pointMove: number | null; signals: SideSignals; best: Selection["best"]; books: number }>;
   steam: Array<{ selectionId: string; gameId: string; label: string; marketLabel: string; game: string; signals: SideSignals; best: Selection["best"] }>;
   sharp: MovementData["steam"];
+  reverse: MovementData["steam"];
   sharpReference: string | null;
   movements: Array<{ sideId: string; gameId: string; market: string; book: string; selection: string; participant: string; fromAmerican: number; toAmerican: number; fromPoint: number | null; toPoint: number | null; probabilityDelta: number; direction: number; movedAt: string; label: string; game: string }>;
 }
@@ -166,14 +174,16 @@ export interface MovementData {
 export interface HistoryData {
   sport: OddsSport;
   sideId: string;
-  selection: { id: string; label: string; marketLabel: string; gameId: string; books: BookPrice[]; fair: FairValue | null; average: Selection["average"] } | null;
+  selection: { id: string; label: string; marketLabel: string; gameId: string; books: BookPrice[]; fair: FairValue | null; average: Selection["average"]; best: Selection["best"]; worst: Selection["worst"]; signals: SideSignals } | null;
   points: Array<{ book: string; american: number; point: number | null; at: string }>;
+  /** Best / worst / average / fair over time (change-only). */
+  range: Array<{ at: string; bestAmerican: number; bestBook: string; worstAmerican: number | null; worstBook: string | null; averageImplied: number | null; fairProbability: number | null; books: number }>;
 }
 
 export interface EvRow {
   selectionId: string; gameId: string; game: string; commenceTime: string | null; status: GameStatus | null; market: string; marketLabel: string;
   category: MarketCategory; label: string; book: string; american: number; decimal: number; implied: number; noVigProbability: number;
-  fairAmerican: number | null; fairSource: string; fairBooks: number; ev: number; edge: number; kelly: number; tier: EvTier; risk: RiskRating | null;
+  fairAmerican: number | null; fairSource: string; fairBooks: number; ev: number; edge: number; kelly: number; tier: EvTier; risk: RiskRating | null; confidence: Confidence;
   marketAverage: number | null; bestPrice: boolean; lastChangeAt: string | null; signals: SideSignals;
 }
 
@@ -234,7 +244,7 @@ export interface PropsData {
   requiresApiKey: boolean;
 }
 
-export type AlertType = "line_move" | "steam" | "sharp" | "positive_ev" | "arbitrage" | "best_price" | "clv";
+export type AlertType = "line_move" | "steam" | "sharp" | "reverse_move" | "positive_ev" | "arbitrage" | "best_price" | "clv";
 
 export interface OddsAlert {
   id: number; type: AlertType; sport: OddsSport; gameId: string; game: string; market: string; sideId: string | null; book: string | null;
