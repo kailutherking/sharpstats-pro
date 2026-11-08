@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 dotenv.config({ path: process.env.ENV_FILE ?? "../.env" });
 
-const port = Number(process.env.PORT ?? 4000);
+// Railway (and most hosts) assign the port through PORT; 4000 is the local default.
+const PORT = Number(process.env.PORT) || 4000;
 
 async function start(): Promise<void> {
   const [{ app }, { pool }, { runMigrations }, { prisma }, { seedDemoAccount }, { startStatsRefreshScheduler }, { startOddsScheduler }] = await Promise.all([
@@ -26,7 +27,9 @@ async function start(): Promise<void> {
   await pool.query(await readFile(seedPath, "utf8"));
   await pool.query("SELECT 1");
   await seedDemoAccount();
-  const server = app.listen(port, () => console.info(`SharpStats API listening on ${port}`));
+  const server = app.listen(PORT, () => {
+    console.log(`SharpStats API listening on ${PORT}`);
+  });
   const stopStatsRefresh = startStatsRefreshScheduler();
   const stopOddsRefresh = startOddsScheduler();
   const shutdown = () => server.close(() => {

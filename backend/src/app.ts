@@ -32,7 +32,8 @@ app.use(cors({ origin: [...allowedOrigins], credentials: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }), authRoutes);
-app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+// /health is for platform health checks (Railway); /api/health stays for existing clients.
+app.get(["/health", "/api/health"], (_req, res) => res.json({ status: "ok" }));
 app.use("/api/bets", betRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/bankroll", bankrollRoutes);

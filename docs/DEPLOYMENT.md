@@ -9,6 +9,10 @@
 
 For production, set `NODE_ENV=production`, terminate TLS at a trusted reverse proxy, set the public `CLIENT_ORIGIN` and browser-reachable `VITE_API_URL` before building the frontend image, rotate keys, and replace the demo password. Refresh cookies are HTTPS-only when `NODE_ENV=production`. Do not publish PostgreSQL to the public internet.
 
+## Railway
+
+Railway assigns the port through `PORT`, and the API listens on it (4000 when unset), so don't set `PORT` yourself. Set the service health-check path to `/health`, which returns `{ "status": "ok" }`. The API starts listening only after the schema and migrations are applied, so allow a startup timeout of at least a minute. Also set `DATABASE_URL`, `JWT_SECRET` and `CLIENT_ORIGIN` (your frontend's public URL).
+
 ## CI/CD
 
 - `ci.yml` runs on pushes to `main`, `develop`, `feature/**` and `fix/**`, and on pull requests: lint, Prisma generation, schema apply, tests, type checks, backend and frontend builds, `npm audit --audit-level=high`, and Docker image builds.
