@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, ArrowDownToLine, ArrowUpRight, BarChart3, Bell, Bookmark, BrainCircuit, Calculator, CircleHelp,
   Compass, FileSpreadsheet, Gauge, LayoutDashboard, LogOut, Menu, Moon, Plus, Search, Settings2,
-  ShieldAlert, Sparkles, Sun, Target, Wallet, X, Zap,
+  ShieldAlert, Sparkles, Sun, Target, Trophy, Wallet, X, Zap,
 } from "lucide-react";
 import { api, tokenStore } from "./lib/api";
 import type { Bet, Performance, Summary, User } from "./lib/types";
@@ -14,12 +14,16 @@ import { BetModal } from "./components/BetModal";
 import { MarketLab } from "./components/MarketLab";
 import { useAuthStore } from "./lib/authStore";
 
-type Page = "Overview" | "Bet tracker" | "Analytics" | "Odds screen" | "Market lab" | "Parlay builder" | "Bankroll" | "Pick analysis" | "Settings";
+const StatsPage = lazy(() => import("./pages/StatsPage").then((module) => ({ default: module.StatsPage })));
+const OddsPage = lazy(() => import("./pages/OddsPage").then((module) => ({ default: module.OddsPage })));
+
+type Page = "Overview" | "Bet tracker" | "Analytics" | "Odds screen" | "Stats" | "Market lab" | "Parlay builder" | "Bankroll" | "Pick analysis" | "Settings";
 const navigation: { name: Page; icon: typeof LayoutDashboard; section: string }[] = [
   { name: "Overview", icon: LayoutDashboard, section: "WORKSPACE" },
   { name: "Bet tracker", icon: FileSpreadsheet, section: "WORKSPACE" },
   { name: "Analytics", icon: BarChart3, section: "WORKSPACE" },
   { name: "Odds screen", icon: Compass, section: "RESEARCH" },
+  { name: "Stats", icon: Trophy, section: "RESEARCH" },
   { name: "Market lab", icon: BrainCircuit, section: "RESEARCH" },
   { name: "Parlay builder", icon: Zap, section: "RESEARCH" },
   { name: "Pick analysis", icon: Target, section: "RESEARCH" },
@@ -83,7 +87,7 @@ function App() {
   const betsQuery = useQuery({ queryKey: ["bets", search], queryFn: () => api.bets(search), enabled: Boolean(user) });
   const summary = summaryQuery.data ?? null;
   const performance = performanceQuery.data ?? null;
-  const bets = betsQuery.data?.bets ?? [];
+  const bets = useMemo(() => betsQuery.data?.bets ?? [], [betsQuery.data]);
   const error = [summaryQuery.error, performanceQuery.error, betsQuery.error]
     .find((issue) => issue instanceof Error)?.message ?? "";
   const refresh = useCallback(async () => {
@@ -165,7 +169,8 @@ function App() {
         </section>}
         {page === "Bet tracker" && <BetTracker bets={bets} search={search} setSearch={setSearch} onAdd={() => setBetModal(true)} onChanged={refresh} />}
         {page === "Analytics" && <Analytics performance={performance} summary={summary} />}
-        {page === "Odds screen" && <OddsScreen onLog={(draft) => { setBetDraft(draft); setBetModal(true); }} />}
+        {page === "Odds screen" && <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-line bg-panel text-sm text-muted">Loading odds screen…</div>}><OddsPage onLog={(draft) => { setBetDraft(draft); setBetModal(true); }} /></Suspense>}
+        {page === "Stats" && <Suspense fallback={<div className="flex min-h-[240px] items-center justify-center text-lime"><Activity className="animate-pulse" /></div>}><StatsPage /></Suspense>}
         {page === "Market lab" && <MarketLab onTrack={(draft) => { setBetDraft(draft); setBetModal(true); }} onGraded={() => void refresh()} />}
         {page === "Parlay builder" && <ParlayBuilder />}
         {page === "Pick analysis" && <PickAnalysis bankroll={Number(summary?.bankroll.current_bankroll ?? 1000)} />}
@@ -262,55 +267,6 @@ function MetricTile({ label, value, icon }: { label: string; value: string; icon
 }
 function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle: string; action?: ReactNode }) {
   return <div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-bold tracking-[0.17em] text-lime">{eyebrow}</p><h2 className="font-display text-2xl font-extrabold">{title}</h2><p className="mt-1.5 text-sm text-muted">{subtitle}</p></div>{action}</div>;
-}
-
-interface OddsScreenLine {
-  sport: string;
-  event: string;
-  eventId: string;
-  market: string;
-  marketKey: string;
-  point?: number;
-  pick: string;
-  book: string;
-  odds: number;
-  movement: string;
-  edge: string;
-  commenceTime: string;
-}
-function OddsScreen({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
-  const [sport, setSport] = useState("NBA");
-  const [market, setMarket] = useState("All markets");
-  const [book, setBook] = useState("All sportsbooks");
-  const [date, setDate] = useState("");
-  const [lines, setLines] = useState<OddsScreenLine[]>([]);
-  const [source, setSource] = useState("Loading market data");
-  const [arbitrageCount, setArbitrageCount] = useState(0);
-  const sportKeys: Record<string, string> = { NBA: "basketball_nba", NFL: "americanfootball_nfl", MLB: "baseball_mlb", NHL: "icehockey_nhl" };
-  useEffect(() => {
-    api.odds(sportKeys[sport]).then((data) => {
-      setArbitrageCount(data.arbitrage.length);
-      if (data.lines.length) {
-        setSource(data.source);
-        setLines(data.lines.slice(0, 100).map((line) => ({
-          sport: line.sport, event: line.event, eventId: line.eventId, marketKey: line.market, point: line.point,
-          market: `${line.market === "h2h" ? "Moneyline" : line.market === "spreads" ? "Spread" : line.market === "totals" ? "Total" : line.market}${line.point !== undefined ? ` ${line.point}` : ""}`,
-          pick: line.outcome, book: line.sportsbook, odds: line.decimalOdds,
-          movement: line.movement === null ? "—" : `${line.movement > 0 ? "+" : ""}${line.movement.toFixed(2)}`,
-          edge: line.expectedValue === null || line.bookCount < 2 ? "—" : `${(line.expectedValue * 100).toFixed(1)}%`,
-          commenceTime: line.commenceTime,
-        })));
-      } else setSource(data.source === "not_configured" ? "Live odds unavailable · configure provider API key" : "No current lines returned for this sport");
-    }).catch(() => setSource("Live odds provider unavailable"));
-  }, [sport]);
-  const filtered = lines.filter((line) => (sport === "All sports" || line.sport.toLowerCase().includes(sport.toLowerCase())) && (market === "All markets" || line.market.toLowerCase().includes(market.toLowerCase())) && (book === "All sportsbooks" || line.book === book) && (!date || line.commenceTime.slice(0, 10) === date));
-  const best = filtered.reduce<OddsScreenLine | null>((current, line) => !current || line.odds > current.odds ? line : current, null);
-  const positiveEvCount = filtered.filter((line) => line.edge !== "—" && Number(line.edge.replace("%", "")) > 0).length;
-  return <section><PageHeading eyebrow="RESEARCH" title="Odds screen" subtitle="Compare available prices and spot value across the board." /><div className="mb-4 grid gap-3 sm:grid-cols-3"><InfoCard icon={<Zap size={16} />} label="Positive EV opportunities" value={String(positiveEvCount)} tone="lime" /><InfoCard icon={<Compass size={16} />} label="Best price found" value={best ? `${best.pick} · ${best.odds.toFixed(2)}` : "No live lines"} tone="blue" /><InfoCard icon={<Activity size={16} />} label="Arbitrage opportunities" value={source === "The Odds API" ? `${arbitrageCount} found` : "Connect odds provider"} tone="amber" /></div><div className="overflow-hidden rounded-2xl border border-line bg-panel"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4"><div><p className="text-sm font-semibold">Market board</p><p className="mt-1 text-[10px] text-muted">{source}</p></div><div className="flex flex-wrap gap-2"><select value={sport} onChange={(e) => setSport(e.target.value)} className="rounded-lg border border-line bg-[#0c1114] px-3 py-2 text-xs"><option>NBA</option><option>NFL</option><option>MLB</option><option>NHL</option></select><select value={market} onChange={(e) => setMarket(e.target.value)} className="rounded-lg border border-line bg-[#0c1114] px-3 py-2 text-xs"><option>All markets</option><option>Moneyline</option><option>Spread</option><option>Total</option></select><select value={book} onChange={(e) => setBook(e.target.value)} className="rounded-lg border border-line bg-[#0c1114] px-3 py-2 text-xs"><option>All sportsbooks</option>{[...new Set(lines.map((line) => line.book))].map((name) => <option key={name}>{name}</option>)}</select><input aria-label="Filter by date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-lg border border-line bg-[#0c1114] px-3 py-2 text-xs text-muted" /></div></div><div className="overflow-x-auto"><table className="w-full min-w-[730px] text-left"><thead><tr className="text-[9px] tracking-wider text-muted"><th className="px-5 py-3">EVENT</th><th className="px-3 py-3">MARKET / PICK</th><th className="px-3 py-3">SPORTSBOOK</th><th className="px-3 py-3">BEST ODDS</th><th className="px-3 py-3">MOVE</th><th className="px-3 py-3">MODEL EDGE</th><th className="px-5 py-3"></th></tr></thead><tbody>{filtered.map((line) => <tr key={`${line.eventId}-${line.marketKey}-${line.point}-${line.pick}`} className="border-t border-line text-xs"><td className="px-5 py-4"><p>{line.event}</p><p className="mt-1 text-[10px] text-muted">{line.sport} · {line.commenceTime ? new Date(line.commenceTime).toLocaleString() : "Today"}</p></td><td className="px-3 py-4"><p>{line.market}</p><p className="mt-1 text-[10px] text-muted">{line.pick}</p></td><td className="px-3 py-4">{line.book}</td><td className="px-3 py-4 font-bold text-lime">{line.odds.toFixed(2)}</td><td className="px-3 py-4 text-muted">{line.movement}</td><td className="px-3 py-4 text-lime">{line.edge}</td><td className="px-5 py-4 text-right"><button onClick={() => onLog({ sport: line.sport, league: line.sport, event: line.event, bet_type: line.marketKey === "spreads" ? "Spread" : line.marketKey === "totals" ? "Over/Under" : line.marketKey.startsWith("player_") ? "Player Props" : "Moneyline", team_player: line.pick, selection: line.pick, odds: line.odds, sportsbook: line.book, market_key: line.marketKey, line_value: line.point ?? null, event_id: line.eventId })} className="rounded-md border border-line px-2.5 py-1.5 text-[10px] hover:border-lime hover:text-lime">Track</button></td></tr>)}</tbody></table></div><p className="border-t border-line px-5 py-3 text-[10px] text-muted">Odds and model edges are informational; verify prices before placing any wager.</p></div></section>;
-}
-function InfoCard({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: string }) {
-  const color = tone === "lime" ? "text-lime bg-lime/10" : tone === "blue" ? "text-sky-300 bg-sky-400/10" : "text-amber-300 bg-amber-400/10";
-  return <div className="flex items-center gap-3 rounded-xl border border-line bg-panel p-4"><div className={`rounded-lg p-2 ${color}`}>{icon}</div><div><p className="text-[10px] text-muted">{label}</p><p className="mt-1 text-xs font-semibold">{value}</p></div></div>;
 }
 
 function ParlayBuilder() {

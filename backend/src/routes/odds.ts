@@ -23,7 +23,7 @@ router.get("/sportsbooks", async (req: AuthRequest, res, next) => {
   }
 });
 
-router.get("/odds", rateLimit({
+router.get("/odds/scan", rateLimit({
   windowMs: 60 * 1000,
   limit: 6,
   standardHeaders: true,
@@ -166,7 +166,7 @@ router.get("/odds", rateLimit({
   }
 });
 
-router.get("/odds/movement", async (req: AuthRequest, res, next) => {
+router.get("/odds/snapshots", async (req: AuthRequest, res, next) => {
   try {
     const result = await pool.query(
       `SELECT event_id, sport, event, market, point, outcome, sportsbook,

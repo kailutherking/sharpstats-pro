@@ -6,11 +6,13 @@ dotenv.config({ path: process.env.ENV_FILE ?? "../.env" });
 const port = Number(process.env.PORT ?? 4000);
 
 async function start(): Promise<void> {
-  const [{ app }, { pool }, { prisma }, { seedDemoAccount }] = await Promise.all([
+  const [{ app }, { pool }, { prisma }, { seedDemoAccount }, { startStatsRefreshScheduler }, { startOddsScheduler }] = await Promise.all([
     import("./app"),
     import("./db/pool"),
     import("./db/prisma"),
     import("./services/seedDemo"),
+    import("./services/stats.service"),
+    import("./services/odds.service"),
   ]);
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 24) {
     throw new Error("Set JWT_SECRET to a secret of at least 24 characters");
@@ -22,7 +24,11 @@ async function start(): Promise<void> {
   await pool.query("SELECT 1");
   await seedDemoAccount();
   const server = app.listen(port, () => console.info(`SharpStats API listening on ${port}`));
+  const stopStatsRefresh = startStatsRefreshScheduler();
+  const stopOddsRefresh = startOddsScheduler();
   const shutdown = () => server.close(() => {
+    stopStatsRefresh();
+    stopOddsRefresh();
     void Promise.all([pool.end(), prisma.$disconnect()]).then(() => process.exit(0));
   });
   process.on("SIGTERM", shutdown);

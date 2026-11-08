@@ -10,6 +10,20 @@ describe("HTTP API", () => {
     await request(app).get("/api/bets").expect(401);
   });
 
+  it.each(["/api/stats/nba", "/api/stats/player/3945274?league=nba", "/api/stats/team/13?league=nba", "/api/stats/favorites"])(
+    "requires authentication for %s",
+    async (path) => {
+      await request(app).get(path).expect(401);
+    },
+  );
+
+  it.each(["/api/odds?sport=nba", "/api/odds/live", "/api/odds/movement", "/api/odds/arbitrage", "/api/odds/ev", "/api/odds/player-props", "/api/odds/sportsbooks", "/api/odds/history?sideId=abc", "/api/odds/stream", "/api/odds/alerts", "/api/odds/clv"])(
+    "requires authentication for %s",
+    async (path) => {
+      await request(app).get(path).expect(401);
+    },
+  );
+
   it.each(["http://localhost:5175", "http://localhost:5177", "http://192.168.1.180:5175", "http://192.168.1.180:5177", "http://192.168.1.179:5175"])(
     "allows the frontend origin %s",
     async (origin) => {
