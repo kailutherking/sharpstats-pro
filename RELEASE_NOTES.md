@@ -1,5 +1,33 @@
 # Release notes
 
+## SharpStats Pro 1.4.0
+
+**Version:** 1.4.0
+**Release date:** 2026-11-08
+
+### Features added
+- **Credit pacing for The Odds API:** automatic refreshes are spaced so your plan's credits last until the monthly reset.
+  - The league on screen gets the budget first, and background refresh pauses when the budget can't cover it.
+  - Manual Refresh always works.
+  - On large plans the normal 30-second cadence is unaffected.
+- **Restart-safe quota tracking:** the last credit reading and refresh times survive restarts.
+
+### Bug fixes
+- The default refresh schedule could use up the 500-credit free plan in about a day.
+- In-play games no longer flood alerts with steam, sharp and "+EV" signals caused by books updating at different speeds.
+
+### Performance improvements
+- Fewer provider calls: no background refresh when the budget can't afford it, and no refresh burst on restart.
+
+### Breaking changes
+- None.
+
+### Known issues
+- On the free plan (500 credits/month), a viewed league updates automatically every few hours. Manual Refresh costs about 3 credits per league. Real 30-second updates for one league during about 4 viewing hours a day need roughly 45,000 credits a month.
+- As of 2026-11-08, The Odds API returns no Caesars (`williamhill_us`) or Fanatics prices in either US region. Both stay registered and appear automatically if coverage returns. PrizePicks and Underdog only list player props, so they appear on props, not game lines.
+
+Suggested commit message: `feat(odds): pace The Odds API credits and limit signals to pregame markets`
+
 ## SharpStats Pro 1.3.0
 
 **Version:** 1.3.0

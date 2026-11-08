@@ -1,6 +1,6 @@
 import { pool } from "../db/pool";
 import {
-  fetchEvents, fetchEventMarkets, fetchFeaturedBoard, oddsApiConfigured, oddsApiUsage, OddsProviderError, rejectedMarketKeys,
+  fetchEvents, fetchEventMarkets, fetchFeaturedBoard, oddsApiConfigured, oddsApiUsage, OddsProviderError, rejectedMarketKeys, seedOddsApiUsage,
 } from "../providers/theOddsApi";
 import { fetchEspnBoard } from "../providers/espnOdds";
 import {
@@ -18,6 +18,7 @@ import {
 import { buildAlerts, pruneAlerts, storeAlerts } from "./oddsAlerts.service";
 import { attachResearch, buildPropRows, type PropRow } from "./propResearch.service";
 import { broadcast, closeAllStreams, streamClients } from "./oddsStream";
+import { formatInterval, nextResetAt, pacedIntervalMs } from "./creditPacing";
 import type { OddsGame, OddsSource, RawQuote } from "./oddsTypes";
 
 /* ---------- Configuration ---------- */
@@ -35,6 +36,8 @@ const LOW_CREDITS = Math.max(0, Number(process.env.ODDS_MIN_CREDITS ?? 250) || 0
 const THROTTLED_MS = 10 * 60_000;
 const RESEARCH_LIMIT = Math.max(0, Number(process.env.ODDS_PROP_RESEARCH_LIMIT ?? 60) || 0);
 const FIRST_LOAD_TIMEOUT_MS = 25_000;
+const CREDIT_PACING = process.env.ODDS_CREDIT_PACING !== "false";
+const CREDITS_RESET_DAY = Number(process.env.ODDS_CREDITS_RESET_DAY ?? 1) || 1;
 
 export type ProviderSetting = "auto" | "theoddsapi" | "espn";
 
@@ -94,6 +97,48 @@ const states = new Map<OddsSport, SportState>(ODDS_SPORTS.map((sport) => [sport,
   games: new Map(), featured: null, slices: new Map(), source: null, lastAttemptAt: 0, lastSuccessAt: null, lastError: null,
   lastDemandAt: 0, emptyUntil: 0, inflight: new Map(), version: 0, computed: null, closingCaptured: new Set(),
 }]));
+
+function isDemanded(sport: OddsSport, now: number): boolean {
+  return now - state(sport).lastDemandAt < IDLE_MS || streamClients(sport) > 0;
+}
+
+/** Leagues that cost credits to refresh: anything not known to be empty (offseason leagues are skipped for free). */
+function inSeason(sport: OddsSport): boolean {
+  const st = state(sport);
+  return !(st.featured && st.games.size === 0);
+}
+
+/** Featured refresh cost: one credit per featured market (all tracked books fit in one region). */
+function refreshCost(sport: OddsSport): number {
+  return featuredMarkets(sport).length;
+}
+
+/**
+ * Credit pacing. Viewed leagues get the remaining credits (less a reserve) spread evenly until the
+ * monthly reset. Background refresh of unviewed leagues only runs when the budget can also sustain it.
+ */
+function pacing(now = Date.now()): { intervalMs: number; backgroundPaused: boolean; resetAt: number } {
+  const resetAt = nextResetAt(now, CREDITS_RESET_DAY);
+  if (!CREDIT_PACING || providerMode() !== "the-odds-api") return { intervalMs: 0, backgroundPaused: false, resetAt };
+  const remaining = oddsApiUsage().remaining;
+  const cost = Math.max(...ODDS_SPORTS.map(refreshCost));
+  const viewed = ODDS_SPORTS.filter((sport) => inSeason(sport) && isDemanded(sport, now)).length;
+  const intervalMs = pacedIntervalMs({ remaining, costPerRefresh: cost, activeSports: Math.max(1, viewed), now, resetAt });
+  const allInSeason = ODDS_SPORTS.filter(inSeason).length;
+  const backgroundMs = pacedIntervalMs({ remaining, costPerRefresh: cost, activeSports: Math.max(1, allInSeason), now, resetAt });
+  return { intervalMs, backgroundPaused: BACKGROUND_MS > 0 && backgroundMs > BACKGROUND_MS, resetAt };
+}
+
+/** Effective automatic refresh interval for a league: demand-driven base, low-credit throttle and credit pacing. 0 = off. */
+export function autoIntervalMs(sport: OddsSport, now = Date.now()): number {
+  const paced = pacing(now);
+  if (!isDemanded(sport, now)) {
+    if (!BACKGROUND_MS || paced.backgroundPaused) return 0;
+    return throttled() ? Math.max(BACKGROUND_MS, THROTTLED_MS) : BACKGROUND_MS;
+  }
+  const base = throttled() ? Math.max(REFRESH_MS, THROTTLED_MS) : REFRESH_MS;
+  return Math.max(base, paced.intervalMs);
+}
 
 function state(sport: OddsSport): SportState {
   return states.get(sport)!;
@@ -285,7 +330,8 @@ async function refreshSlice(sport: OddsSport, key: string, markets: string[], ga
 async function ensureFeatured(sport: OddsSport, force = false): Promise<void> {
   const st = state(sport);
   markDemand(sport);
-  const due = !st.featured || Date.now() - st.lastAttemptAt >= (throttled() ? THROTTLED_MS : REFRESH_MS);
+  const interval = autoIntervalMs(sport);
+  const due = !st.featured || (interval > 0 && Date.now() - st.lastAttemptAt >= interval);
   if (!force && !due) return;
   const task = refreshFeatured(sport);
   if (force || !st.featured) await Promise.race([task, new Promise((resolve) => setTimeout(resolve, FIRST_LOAD_TIMEOUT_MS).unref?.())]);
@@ -296,7 +342,7 @@ async function ensureSlice(sport: OddsSport, key: string, markets: string[], gam
   const st = state(sport);
   const slice = st.slices.get(key);
   if (slice) slice.requestedAt = Date.now();
-  if (!force && slice && Date.now() - slice.fetchedAt < (throttled() ? THROTTLED_MS : ttl)) return;
+  if (!force && slice && Date.now() - slice.fetchedAt < Math.max(throttled() ? THROTTLED_MS : ttl, autoIntervalMs(sport))) return;
   const task = refreshSlice(sport, key, markets, gameIds);
   if (force || !slice) await task;
   else void task.catch(() => undefined);
@@ -335,17 +381,28 @@ export interface ProviderStatus {
   notes: string[];
   provider: ProviderSetting;
   warning: string | null;
+  /** Set when credit pacing stretches automatic refreshes beyond ODDS_REFRESH_SECONDS. intervalSeconds null = paused. */
+  pacing: { intervalSeconds: number | null; resetAt: string } | null;
 }
 
 export function providerStatus(sport: OddsSport): ProviderStatus {
   const st = state(sport);
   const mode = providerMode();
-  const interval = throttled() ? THROTTLED_MS : REFRESH_MS;
+  const paced = pacing();
+  // Interval while the screen is open (the status is read by a viewer).
+  const interval = Math.max(throttled() ? THROTTLED_MS : REFRESH_MS, paced.intervalMs);
   const notes: string[] = [];
   const warning = providerWarning();
   if (warning) notes.push(warning);
   if (mode === "espn" && providerSetting() !== "espn") notes.push("Keyless mode: DraftKings lines via ESPN. Add ODDS_API_KEY for every sportsbook, period markets, player props, no-vig EV and arbitrage.");
-  if (throttled()) notes.push(`Provider credits are below ${LOW_CREDITS}; refreshes slowed to every 10 minutes.`);
+  const pacingActive = mode === "the-odds-api" && paced.intervalMs > REFRESH_MS;
+  if (pacingActive) {
+    const remaining = oddsApiUsage().remaining ?? 0;
+    const resetDate = new Date(paced.resetAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    notes.push(Number.isFinite(paced.intervalMs)
+      ? `Credit pacing: ${remaining} The Odds API credits left until ${resetDate}, so this league updates automatically every ${formatInterval(paced.intervalMs)} while it's open${paced.backgroundPaused ? " (background updates paused)" : ""}. Use Refresh to update now (about ${refreshCost(sport)} credits).`
+      : `Credit pacing: only ${remaining} credits left until ${resetDate}; automatic updates are paused and the rest is kept for manual refreshes.`);
+  } else if (throttled()) notes.push(`Provider credits are below ${LOW_CREDITS}; refreshes slowed to every 10 minutes.`);
   if (mode === "the-odds-api" && sharpBook()) notes.push(`Fair odds use ${bookByKey(sharpBook()!)?.name ?? sharpBook()} no-vig when it prices the main line, otherwise the consensus of every priced book.`);
   return {
     mode,
@@ -353,12 +410,13 @@ export function providerStatus(sport: OddsSport): ProviderStatus {
     configured: oddsApiConfigured(),
     provider: providerSetting(),
     warning,
-    connected: Boolean(st.lastSuccessAt && !st.lastError && Date.now() - st.lastSuccessAt < Math.max(interval * 3, 120_000)),
+    connected: Boolean(st.lastSuccessAt && !st.lastError && (pacingActive || Date.now() - st.lastSuccessAt < Math.max(interval * 3, 120_000))),
     lastSuccessAt: st.lastSuccessAt ? new Date(st.lastSuccessAt).toISOString() : null,
     lastAttemptAt: st.lastAttemptAt ? new Date(st.lastAttemptAt).toISOString() : null,
     lastError: st.lastError,
-    nextRefreshAt: st.lastAttemptAt ? new Date(st.lastAttemptAt + interval).toISOString() : null,
-    refreshSeconds: Math.round(interval / 1000),
+    nextRefreshAt: st.lastAttemptAt && Number.isFinite(interval) ? new Date(st.lastAttemptAt + interval).toISOString() : null,
+    refreshSeconds: Number.isFinite(interval) ? Math.round(interval / 1000) : 0,
+    pacing: pacingActive ? { intervalSeconds: Number.isFinite(paced.intervalMs) ? Math.round(paced.intervalMs / 1000) : null, resetAt: new Date(paced.resetAt).toISOString() } : null,
     throttled: throttled(),
     credits: mode === "the-odds-api" ? oddsApiUsage() : null,
     unsupportedMarkets: rejectedMarketKeys(sport),
@@ -574,7 +632,7 @@ export async function getEv(sport: OddsSport, options: { minEv: number; category
         ev: price.ev!, decimal: price.decimal, fairBooks: selection.fair!.books, sharpReference: selection.fair!.source === "sharp",
         isProp: selection.category === "prop", booksAtLine: selection.books.filter((item) => item.priced && item.atLine).length,
         priceAgeSeconds: price.bookUpdatedAt ? Math.max(0, (Date.now() - Date.parse(price.bookUpdatedAt)) / 1000) : null,
-        steam: selection.signals.steam,
+        steam: selection.signals.steam, live: st.games.get(selection.gameId)?.status === "live",
       }),
       marketAverage: selection.average?.american ?? null,
       bestPrice: price.isBest,
@@ -964,22 +1022,48 @@ async function syncMarketSupport(sport: OddsSport): Promise<void> {
 
 /* ---------- Scheduler ---------- */
 
+async function restoreRefreshState(): Promise<void> {
+  if (providerMode() !== "the-odds-api") return;
+  try {
+    const credits = await pool.query<{ credits_remaining: number; created_at: Date }>(
+      `SELECT credits_remaining, created_at FROM odds_refresh_log
+       WHERE provider = 'the-odds-api' AND credits_remaining IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
+    );
+    const last = credits.rows[0];
+    if (last) seedOddsApiUsage({ remaining: last.credits_remaining, updatedAt: last.created_at.toISOString() });
+    const attempts = await pool.query<{ sport: OddsSport; last_at: Date }>(
+      `SELECT sport, MAX(created_at) AS last_at FROM odds_refresh_log
+       WHERE provider = 'the-odds-api' AND scope = 'featured' GROUP BY sport`,
+    );
+    for (const row of attempts.rows) {
+      if (!ODDS_SPORTS.includes(row.sport)) continue;
+      const st = state(row.sport);
+      st.lastAttemptAt = Math.max(st.lastAttemptAt, row.last_at.getTime());
+    }
+  } catch (error) {
+    console.warn("Odds refresh state restore failed", error instanceof Error ? error.message : error);
+  }
+}
+
 export function startOddsScheduler(): () => void {
   if (process.env.ODDS_AUTO_REFRESH === "false") return () => undefined;
   void syncRegistry().catch((error: unknown) => console.warn("Odds registry sync failed", error instanceof Error ? error.message : error));
+  // Restore the last quota reading and refresh times so a restart doesn't trigger a burst of priced calls.
+  let ready = false;
+  void restoreRefreshState().finally(() => { ready = true; });
   const tick = () => {
+    if (!ready) return;
     const now = Date.now();
     for (const sport of ODDS_SPORTS) {
       const st = state(sport);
-      const demanded = now - st.lastDemandAt < IDLE_MS || streamClients(sport) > 0;
-      const base = demanded ? REFRESH_MS : BACKGROUND_MS;
-      if (!base) continue;
-      const interval = throttled() ? Math.max(base, THROTTLED_MS) : base;
+      const demanded = isDemanded(sport, now);
+      const interval = autoIntervalMs(sport, now);
+      if (!interval) continue;
       if (now - st.lastAttemptAt >= interval) void refreshFeatured(sport);
       if (!demanded || providerMode() !== "the-odds-api") continue;
       for (const [key, slice] of st.slices) {
         const ttl = key.startsWith("game:") ? EVENT_TTL_MS : PROP_TTL_MS;
-        if (now - slice.requestedAt < IDLE_MS && now - slice.fetchedAt >= (throttled() ? THROTTLED_MS : ttl)) {
+        if (now - slice.requestedAt < IDLE_MS && now - slice.fetchedAt >= Math.max(throttled() ? THROTTLED_MS : ttl, interval)) {
           void refreshSlice(sport, key, slice.markets, key.startsWith("scan:") ? upcomingGameIds(sport) : slice.gameIds).catch(() => undefined);
         }
         if (now - slice.requestedAt > 6 * 3_600_000) st.slices.delete(key);

@@ -53,7 +53,11 @@ function pct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-export function buildAlerts(input: {
+/**
+ * Alerts cover games that haven't started. In-play prices move on every play and books update
+ * seconds apart, so live moves, gaps and "edges" are mostly noise and would flood the feed.
+ */
+export function buildAlerts(raw: {
   sport: OddsSport;
   games: Map<string, OddsGame>;
   selections: Selection[];
@@ -62,6 +66,13 @@ export function buildAlerts(input: {
   openedEv: Set<string>;
   now?: number;
 }): Draft[] {
+  const pregame = (gameId: string) => raw.games.get(gameId)?.status !== "live";
+  const input = {
+    ...raw,
+    selections: raw.selections.filter((selection) => pregame(selection.gameId)),
+    moves: raw.moves.filter((move) => pregame(move.gameId)),
+    openedArbitrage: raw.openedArbitrage.filter((opportunity) => pregame(opportunity.gameId)),
+  };
   const now = input.now ?? Date.now();
   const bucket = Math.floor(now / DEDUPE_BUCKET_MS);
   const state = previous.get(input.sport) ?? { steam: new Set<string>(), sharp: new Set<string>(), reverse: new Set<string>(), best: new Map<string, string>(), clv: new Set<string>() };

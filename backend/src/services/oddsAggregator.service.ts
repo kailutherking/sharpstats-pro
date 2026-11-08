@@ -381,16 +381,19 @@ export function aggregate(input: AggregateInput): { selections: Selection[]; arb
             ev: bestEv, decimal: bestPrice.decimal, fairBooks: fair!.books, sharpReference: fair!.source === "sharp",
             isProp: def.category === "prop", booksAtLine: comparable.length,
             priceAgeSeconds: bestPrice.bookUpdatedAt ? Math.max(0, (now - Date.parse(bestPrice.bookUpdatedAt)) / 1000) : null,
-            steam: input.signals(id)?.steam,
+            steam: input.signals(id)?.steam, live: game?.status === "live",
           })
           : null,
         arbitrage: null,
-        signals: { ...NO_SIGNALS, ...(input.signals(id) ?? {}) },
+        // Steam/sharp/RLM describe pregame markets; in-play prices move on every play.
+        signals: game?.status === "live"
+          ? { ...NO_SIGNALS, moves: input.signals(id)?.moves ?? 0, lastMoveAt: input.signals(id)?.lastMoveAt ?? null }
+          : { ...NO_SIGNALS, ...(input.signals(id) ?? {}) },
         updatedAt: latest || new Date(now).toISOString(),
       });
     }
 
-    const reverseId = reverseLineSide(sideSelections);
+    const reverseId = game?.status === "live" ? null : reverseLineSide(sideSelections);
     if (reverseId) for (const selection of sideSelections) if (selection.id === reverseId) selection.signals = { ...selection.signals, reverse: true };
 
     // Arbitrage: the best price on every side at the main line, across different priced books.

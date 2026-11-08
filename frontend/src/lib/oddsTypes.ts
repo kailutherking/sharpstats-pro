@@ -98,6 +98,8 @@ export interface ProviderStatus {
   notes: string[];
   provider: "auto" | "theoddsapi" | "espn";
   warning: string | null;
+  /** Credit pacing stretches automatic refreshes so provider credits last until the monthly reset. */
+  pacing: { intervalSeconds: number | null; resetAt: string } | null;
 }
 
 export interface BookInfo {

@@ -60,7 +60,7 @@ function matchesRule(rule: AlertRule, alert: OddsAlert): boolean {
 
 function ConnectionPill({ state, polling }: { state: StreamState; polling: boolean }) {
   const live = state === "live";
-  const label = live ? "Live stream" : state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : polling ? "Polling every 30s" : "Offline";
+  const label = live ? "Live stream" : state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : polling ? "Polling" : "Offline";
   return (
     <span className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-[11px] ${live ? "border-[#34412a] text-lime" : "border-line text-amber-300"}`} title="Connection status">
       {live ? <Wifi size={13} /> : <WifiOff size={13} />}{label}
@@ -304,7 +304,8 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
       {status?.warning && <div className="mb-4"><Notice tone="warn">{status.warning}</Notice></div>}
       {status && keyless && !status.warning && status.notes.some((note) => note.startsWith("Keyless")) && <div className="mb-4"><Notice tone="warn">{status.notes.find((note) => note.startsWith("Keyless"))}</Notice></div>}
       {status?.lastError && <div className="mb-4"><Notice tone="error">Provider issue: {status.lastError}. Showing the last good snapshot.</Notice></div>}
-      {status?.throttled && <div className="mb-4"><Notice tone="warn">{status.notes.find((note) => note.includes("credits"))}</Notice></div>}
+      {status?.pacing ? <div className="mb-4"><Notice tone="info">{status.notes.find((note) => note.startsWith("Credit pacing"))}</Notice></div>
+        : status?.throttled && <div className="mb-4"><Notice tone="warn">{status.notes.find((note) => note.includes("credits"))}</Notice></div>}
 
       {board.isLoading && !data ? <LoadingBlock label="Loading live sportsbook odds…" /> : board.error && !data ? (
         <Notice tone="error">{board.error instanceof Error ? board.error.message : "Could not load odds."}</Notice>
@@ -331,7 +332,7 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
               onOpen={(alert) => { if (alert.sideId) openSelection(alert.sideId); else setGameFor(alert.gameId); }} />
           )}
           {tab === "clv" && <ClvTracker data={clv.data} loading={clv.isLoading} />}
-          <p className="mt-4 text-[10px] text-muted">Source: {data.status.label}. {data.status.notes.filter((note) => !note.startsWith("Keyless") && note !== data.status.warning).join(" ")} Odds are informational; confirm prices with the sportsbook before wagering.</p>
+          <p className="mt-4 text-[10px] text-muted">Source: {data.status.label}. {data.status.notes.filter((note) => !note.startsWith("Keyless") && !note.startsWith("Credit pacing") && note !== data.status.warning).join(" ")} Odds are informational; confirm prices with the sportsbook before wagering.</p>
         </>
       ) : null}
 
