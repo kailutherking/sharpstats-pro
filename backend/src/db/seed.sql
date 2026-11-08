@@ -1,4 +1,5 @@
 INSERT INTO sportsbooks(name, region) VALUES
   ('DraftKings', 'US'), ('FanDuel', 'US'), ('BetMGM', 'US'),
-  ('Caesars', 'US'), ('ESPN BET', 'US'), ('BetRivers', 'US')
+  ('Caesars', 'US'), ('ESPN BET', 'US'), ('BetRivers', 'US'),
+  ('Fanatics', 'US'), ('PrizePicks', 'US'), ('Underdog Fantasy', 'US'), ('PointsBet', 'US')
 ON CONFLICT (name) DO NOTHING;

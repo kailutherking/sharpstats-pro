@@ -19,6 +19,9 @@ model User {
   refreshTokens       RefreshToken[]
   oddsSnapshots       OddsSnapshot[]
   analytics           Analytics?
+  favoriteStats       FavoriteStat[]
+  oddsAlertRules      OddsAlertRule[]
+  oddsFavorites       OddsFavorite[]
 
   @@map("users")
 }
@@ -68,6 +71,9 @@ model Sportsbook {
   id        Int                  @id @default(autoincrement())
   name      String               @unique @db.VarChar(80)
   region    String               @default("US") @db.VarChar(30)
+  bookKey   String?              @map("book_key") @db.VarChar(40)
+  kind      String               @default("sportsbook") @db.VarChar(12)
+  active    Boolean              @default(true)
   favorites FavoriteSportsbook[]
 
   @@map("sportsbooks")
@@ -126,4 +132,231 @@ model Analytics {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("analytics")
+}
+
+model StatsCache {
+  cacheKey  String   @id @map("cache_key") @db.VarChar(160)
+  payload   Json
+  fetchedAt DateTime @default(now()) @map("fetched_at") @db.Timestamptz
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+
+  @@index([expiresAt])
+  @@map("stats_cache")
+}
+
+model FavoriteStat {
+  userId     Int      @map("user_id")
+  league     String   @db.VarChar(8)
+  entityType String   @map("entity_type") @db.VarChar(8)
+  entityId   String   @map("entity_id") @db.VarChar(40)
+  name       String   @db.VarChar(120)
+  teamAbbr   String   @default("") @map("team_abbr") @db.VarChar(12)
+  imageUrl   String?  @map("image_url")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, league, entityType, entityId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("favorite_stats")
+}
+
+// Odds intelligence platform (see src/db/schema.sql for indexes and the odds_player_props view).
+
+model OddsGame {
+  id           String   @id @db.VarChar(100)
+  sport        String   @db.VarChar(8)
+  homeTeam     String   @map("home_team") @db.VarChar(120)
+  awayTeam     String   @map("away_team") @db.VarChar(120)
+  homeAbbr     String?  @map("home_abbr") @db.VarChar(12)
+  awayAbbr     String?  @map("away_abbr") @db.VarChar(12)
+  commenceTime DateTime @map("commence_time") @db.Timestamptz
+  status       String   @default("pregame") @db.VarChar(10)
+  provider     String   @db.VarChar(20)
+  firstSeenAt  DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt   DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  @@map("odds_games")
+}
+
+model OddsMarket {
+  sport      String  @db.VarChar(8)
+  marketKey  String  @map("market_key") @db.VarChar(60)
+  label      String  @db.VarChar(80)
+  category   String  @db.VarChar(12)
+  marketType String  @map("market_type") @db.VarChar(12)
+  period     String  @default("game") @db.VarChar(6)
+  featured   Boolean @default(false)
+  supported  Boolean @default(true)
+
+  @@id([sport, marketKey])
+  @@map("odds_markets")
+}
+
+model OddsLine {
+  lineId        String    @id @map("line_id")
+  sideId        String    @map("side_id")
+  gameId        String    @map("game_id") @db.VarChar(100)
+  sport         String    @db.VarChar(8)
+  marketKey     String    @map("market_key") @db.VarChar(60)
+  bookKey       String    @map("book_key") @db.VarChar(40)
+  selection     String    @db.VarChar(180)
+  participant   String    @default("") @db.VarChar(180)
+  point         Decimal?  @db.Decimal(10, 2)
+  priceAmerican Int       @map("price_american")
+  openAmerican  Int       @map("open_american")
+  openPoint     Decimal?  @map("open_point") @db.Decimal(10, 2)
+  openAt        DateTime  @map("open_at") @db.Timestamptz
+  prevAmerican  Int?      @map("prev_american")
+  prevPoint     Decimal?  @map("prev_point") @db.Decimal(10, 2)
+  highAmerican  Int       @map("high_american")
+  lowAmerican   Int       @map("low_american")
+  highPoint     Decimal?  @map("high_point") @db.Decimal(10, 2)
+  lowPoint      Decimal?  @map("low_point") @db.Decimal(10, 2)
+  lastChangeAt  DateTime? @map("last_change_at") @db.Timestamptz
+  firstSeenAt   DateTime  @map("first_seen_at") @db.Timestamptz
+  lastSeenAt    DateTime  @map("last_seen_at") @db.Timestamptz
+  isProp        Boolean   @default(false) @map("is_prop")
+
+  @@index([gameId])
+  @@index([sideId])
+  @@map("odds_lines")
+}
+
+model OddsHistory {
+  id            BigInt   @id @default(autoincrement())
+  lineId        String   @map("line_id")
+  sideId        String   @map("side_id")
+  gameId        String   @map("game_id") @db.VarChar(100)
+  marketKey     String   @map("market_key") @db.VarChar(60)
+  bookKey       String   @map("book_key") @db.VarChar(40)
+  point         Decimal? @db.Decimal(10, 2)
+  priceAmerican Int      @map("price_american")
+  observedAt    DateTime @default(now()) @map("observed_at") @db.Timestamptz
+
+  @@index([sideId, observedAt])
+  @@map("odds_history")
+}
+
+model OddsLineMovement {
+  id               BigInt   @id @default(autoincrement())
+  sideId           String   @map("side_id")
+  lineId           String   @map("line_id")
+  sport            String   @db.VarChar(8)
+  gameId           String   @map("game_id") @db.VarChar(100)
+  marketKey        String   @map("market_key") @db.VarChar(60)
+  bookKey          String   @map("book_key") @db.VarChar(40)
+  selection        String   @db.VarChar(180)
+  participant      String   @default("") @db.VarChar(180)
+  fromAmerican     Int      @map("from_american")
+  toAmerican       Int      @map("to_american")
+  fromPoint        Decimal? @map("from_point") @db.Decimal(10, 2)
+  toPoint          Decimal? @map("to_point") @db.Decimal(10, 2)
+  probabilityDelta Decimal  @map("probability_delta") @db.Decimal(8, 5)
+  direction        Int      @db.SmallInt
+  movedAt          DateTime @default(now()) @map("moved_at") @db.Timestamptz
+
+  @@map("odds_line_movements")
+}
+
+model OddsEvHistory {
+  id              BigInt    @id @default(autoincrement())
+  sideId          String    @map("side_id")
+  bookKey         String    @map("book_key") @db.VarChar(40)
+  priceAmerican   Int       @map("price_american")
+  sport           String    @db.VarChar(8)
+  gameId          String    @map("game_id") @db.VarChar(100)
+  marketKey       String    @map("market_key") @db.VarChar(60)
+  label           String    @db.VarChar(240)
+  fairProbability Decimal   @map("fair_probability") @db.Decimal(8, 5)
+  ev              Decimal   @db.Decimal(8, 5)
+  peakEv          Decimal   @map("peak_ev") @db.Decimal(8, 5)
+  kelly           Decimal   @default(0) @db.Decimal(8, 5)
+  firstSeenAt     DateTime  @map("first_seen_at") @db.Timestamptz
+  lastSeenAt      DateTime  @map("last_seen_at") @db.Timestamptz
+  closedAt        DateTime? @map("closed_at") @db.Timestamptz
+
+  @@map("odds_ev_history")
+}
+
+model OddsArbitrage {
+  signature     String    @id
+  sport         String    @db.VarChar(8)
+  gameId        String    @map("game_id") @db.VarChar(100)
+  marketKey     String    @map("market_key") @db.VarChar(60)
+  participant   String    @default("") @db.VarChar(180)
+  profitPct     Decimal   @map("profit_pct") @db.Decimal(8, 5)
+  peakProfitPct Decimal   @map("peak_profit_pct") @db.Decimal(8, 5)
+  legs          Json
+  books         String    @default("")
+  firstSeenAt   DateTime  @map("first_seen_at") @db.Timestamptz
+  lastSeenAt    DateTime  @map("last_seen_at") @db.Timestamptz
+  closedAt      DateTime? @map("closed_at") @db.Timestamptz
+
+  @@map("odds_arbitrage")
+}
+
+model OddsRefreshLog {
+  id               BigInt   @id @default(autoincrement())
+  sport            String   @db.VarChar(8)
+  scope            String   @db.VarChar(20)
+  provider         String   @db.VarChar(20)
+  status           String   @db.VarChar(8)
+  quotes           Int      @default(0)
+  creditsRemaining Int?     @map("credits_remaining")
+  creditsLast      Int?     @map("credits_last")
+  error            String?
+  durationMs       Int      @default(0) @map("duration_ms")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("odds_refresh_log")
+}
+
+model OddsAlert {
+  id        BigInt   @id @default(autoincrement())
+  signature String   @unique
+  alertType String   @map("alert_type") @db.VarChar(16)
+  sport     String   @db.VarChar(8)
+  gameId    String   @map("game_id") @db.VarChar(100)
+  gameLabel String   @default("") @map("game_label") @db.VarChar(260)
+  marketKey String   @default("") @map("market_key") @db.VarChar(60)
+  sideId    String?  @map("side_id")
+  bookKey   String?  @map("book_key") @db.VarChar(40)
+  title     String   @db.VarChar(260)
+  message   String
+  severity  String   @default("info") @db.VarChar(8)
+  value     Decimal? @db.Decimal(10, 5)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("odds_alerts")
+}
+
+model OddsAlertRule {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  name      String   @db.VarChar(60)
+  alertType String   @map("alert_type") @db.VarChar(16)
+  sport     String?  @db.VarChar(8)
+  marketKey String?  @map("market_key") @db.VarChar(60)
+  bookKey   String?  @map("book_key") @db.VarChar(40)
+  query     String?  @db.VarChar(60)
+  minValue  Decimal? @map("min_value") @db.Decimal(10, 5)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("odds_alert_rules")
+}
+
+model OddsFavorite {
+  userId    Int      @map("user_id")
+  kind      String   @db.VarChar(8)
+  itemKey   String   @map("item_key") @db.VarChar(400)
+  label     String   @db.VarChar(160)
+  sport     String   @db.VarChar(8)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, kind, itemKey])
+  @@map("odds_favorites")
 }
