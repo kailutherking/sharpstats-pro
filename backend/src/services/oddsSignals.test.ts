@@ -2,6 +2,7 @@ import { americanToDecimal, confidenceRating } from "./evCalculator.service";
 import { aggregate, lineId, reverseLineSide, type LineState, type SideSignals } from "./oddsAggregator.service";
 import { providerMode, providerSetting, providerStatus } from "./odds.service";
 import { parseMigrationFile } from "../db/migrate";
+import { buildAlerts } from "./oddsAlerts.service";
 import type { OddsGame, RawQuote } from "./oddsTypes";
 
 const noSignals = (): SideSignals => ({ steam: false, sharp: false, reverse: false, moves: 0, lastMoveAt: null });
@@ -127,5 +128,40 @@ describe("migrations", () => {
     expect(migration).toMatchObject({ version: "001", name: "odds_selection_history" });
     expect(migration!.checksum).toHaveLength(64);
     expect(parseMigrationFile("add-thing.sql", "")).toBeNull();
+  });
+});
+
+describe("live games", () => {
+  const quotes = [
+    q({ market: "h2h", book: "pinnacle", selection: "Boston Celtics", american: -150 }),
+    q({ market: "h2h", book: "pinnacle", selection: "New York Knicks", american: 135 }),
+    q({ market: "h2h", book: "draftkings", selection: "Boston Celtics", american: -110 }),
+    q({ market: "h2h", book: "draftkings", selection: "New York Knicks", american: 100 }),
+  ];
+  const signals = (): SideSignals => ({ steam: true, sharp: true, reverse: false, moves: 4, lastMoveAt: "2026-11-08T19:00:00Z" });
+  const build = (status: OddsGame["status"]) => {
+    const games = new Map([["g1", { ...game, status }]]);
+    const { selections } = aggregate({ games, quotes, lineStates: new Map(), signals, sharpBook: "pinnacle" });
+    const celtics = selections.find((selection) => selection.selection === "Boston Celtics")!;
+    const alerts = buildAlerts({
+      sport: "nba", games, selections, moves: [], openedArbitrage: [],
+      openedEv: new Set([`${celtics.id}|draftkings|-110`]),
+    });
+    return { celtics, alerts };
+  };
+
+  it("keeps steam/sharp and EV alerts for pregame markets", () => {
+    const { celtics, alerts } = build("pregame");
+    expect(celtics.signals.steam).toBe(true);
+    expect(celtics.ev).toBeGreaterThan(0.03);
+    expect(alerts.some((alert) => alert.type === "positive_ev")).toBe(true);
+  });
+
+  it("drops signals and alerts for in-play markets and lowers confidence", () => {
+    const pregame = build("pregame").celtics;
+    const { celtics, alerts } = build("live");
+    expect(celtics.signals).toMatchObject({ steam: false, sharp: false, reverse: false, moves: 4 });
+    expect(alerts).toHaveLength(0);
+    expect(celtics.confidence!.score).toBeLessThan(pregame.confidence!.score);
   });
 });

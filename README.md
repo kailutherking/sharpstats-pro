@@ -74,6 +74,8 @@ Copy `.env.example` to `.env`. Secrets stay in `.env`, which git ignores; never 
 | `ODDS_BACKGROUND_REFRESH_MINUTES` | `30` | Refresh interval with no viewers (`0` disables) |
 | `ODDS_SHARP_BOOK` | `pinnacle` | Reference book for fair prices and sharp moves |
 | `ODDS_MIN_CREDITS` | `250` | Below this many provider credits, refreshes slow to every 10 minutes |
+| `ODDS_CREDIT_PACING` | `true` | Stretch automatic refreshes so remaining credits (less a 20% reserve for manual refreshes, drawers and props) last until the reset; background refresh pauses when the budget can't cover it |
+| `ODDS_CREDITS_RESET_DAY` | `1` | Day of the month (UTC) your The Odds API quota resets |
 | `ODDS_EXTRA_BOOKS` | empty | Extra books as `key\|Name\|kind`, comma-separated |
 | `SPORTRADAR_API_KEY` | empty | Sportradar schedule adapter example |
 | `STATS_REFRESH_MINUTES` / `STATS_AUTO_REFRESH` | `15` / `true` | Stats cache refresh |

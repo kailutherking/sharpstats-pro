@@ -21,6 +21,14 @@ const usage: ProviderUsage = { remaining: null, used: null, lastCost: null, upda
 /** Markets the provider rejected for a sport; skipped on later requests for the process lifetime. */
 const rejectedMarkets = new Set<string>();
 
+/** Restores the last known quota reading (from the refresh log) after a restart. */
+export function seedOddsApiUsage(reading: { remaining: number | null; used?: number | null; updatedAt: string }): void {
+  if (usage.remaining !== null || reading.remaining === null) return;
+  usage.remaining = reading.remaining;
+  usage.used = reading.used ?? null;
+  usage.updatedAt = reading.updatedAt;
+}
+
 export function oddsApiConfigured(): boolean {
   return Boolean(process.env.ODDS_API_KEY?.trim());
 }

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-08
+
+### Added
+- Credit pacing for The Odds API (`ODDS_CREDIT_PACING`, `ODDS_CREDITS_RESET_DAY`). Automatic refreshes are stretched so the remaining credits, less a 20% reserve for manual refreshes, game drawers and props, last until the monthly reset. The league you're viewing gets the budget first, and background refresh pauses when it can't be afforded. The Odds screen explains the current cadence, and `/api/odds/status` returns `pacing`.
+- The last quota reading and refresh times are restored from `odds_refresh_log` on restart, so restarts don't trigger a burst of paid calls.
+
+### Changed
+- Steam, sharp and reverse-line-movement signals and all alerts now cover only games that haven't started. In-play prices still show.
+- EV confidence drops by 30 points for in-play prices, because books update at different speeds.
+- Refresh status text no longer assumes a fixed 30-second cadence.
+
+### Fixed
+- With the free plan (500 credits/month), the default 30-second and 30-minute background refreshes would have used up the monthly quota in about a day.
+
 ## [1.3.0] - 2026-11-08
 
 ### Added
@@ -78,6 +92,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Docker now serves the production frontend through Nginx and prunes development dependencies from the backend image.
 - Odds and analysis features are documented as quota-dependent, on-demand research rather than guaranteed predictions.
 
-[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/kailutherking/sharpstats-pro/compare/0398248...v1.2.0
