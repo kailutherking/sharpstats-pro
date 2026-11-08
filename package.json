@@ -1,15 +1,24 @@
 {
   "name": "sharpstats-pro",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "scripts": {
     "dev": "concurrently -k -n api,web -c yellow,cyan \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
     "build": "npm run build --workspace backend && npm run build --workspace frontend",
     "typecheck": "npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
-    "test": "npm test --workspace backend && npm test --workspace frontend"
+    "test": "npm test --workspace backend && npm test --workspace frontend",
+    "lint": "eslint . --max-warnings 0"
   },
-  "workspaces": ["backend", "frontend"],
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "@eslint/js": "^9.39.5",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "typescript-eslint": "^8.72.1"
   }
 }

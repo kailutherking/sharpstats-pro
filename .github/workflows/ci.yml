@@ -2,14 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop, "feature/**", "fix/**"]
   pull_request:
+    branches: [main, develop]
+  workflow_call:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
+    name: Lint, test and build
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -35,11 +42,50 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run prisma:generate --workspace backend
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Generate Prisma client
+        run: npm run prisma:generate --workspace backend
       - name: Apply database schema
-        run: PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/schema.sql && PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/seed.sql
-      - run: npm test
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm audit --audit-level=high
+        run: |
+          PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/schema.sql
+          PGPASSWORD=sharpstats psql -h localhost -U sharpstats -d sharpstats -v ON_ERROR_STOP=1 -f backend/src/db/seed.sql
+      - name: Test
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build backend
+        run: npm run build --workspace backend
+      - name: Build frontend
+        run: npm run build --workspace frontend
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+  production-readiness:
+    name: Production images
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+      - name: Check schema and secrets hygiene
+        run: |
+          test -f .env.example
+          if git ls-files | grep -E '(^|/)\.env$'; then echo "A .env file is committed" && exit 1; fi
+          grep -q "CREATE TABLE IF NOT EXISTS" backend/src/db/schema.sql
