@@ -9,3 +9,4 @@ backend/dist
 backend/src/generated/prisma
 frontend/dist
 *.log
+.vercel
