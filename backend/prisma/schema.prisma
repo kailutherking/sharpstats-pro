@@ -552,3 +552,175 @@ model TeamHealth {
   @@index([league, teamId, recordedAt(sort: Desc)], map: "team_health_team_idx")
   @@map("team_health")
 }
+
+/// Social, engagement and notifications: applied by src/db/migrations/003_social_engagement.sql.
+/// Foreign keys to users/bets/posts are enforced in SQL (ON DELETE CASCADE / SET NULL).
+model UserProfile {
+  userId              Int       @id @map("user_id")
+  handle              String    @unique @db.VarChar(30)
+  bio                 String    @default("") @db.VarChar(280)
+  avatarUrl           String?   @map("avatar_url") @db.VarChar(500)
+  favoriteSports      String[]  @default([]) @map("favorite_sports")
+  isPublic            Boolean   @default(true) @map("is_public")
+  xp                  Int       @default(0)
+  level               Int       @default(1)
+  streakDays          Int       @default(0) @map("streak_days")
+  bestStreak          Int       @default(0) @map("best_streak")
+  visitDays           Int       @default(0) @map("visit_days")
+  lastActiveDate      DateTime? @map("last_active_date") @db.Date
+  onboardingDismissed Boolean   @default(false) @map("onboarding_dismissed")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("user_profiles")
+}
+
+model UserPreference {
+  userId        Int      @id @map("user_id")
+  notifications Json     @default("{}")
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("user_preferences")
+}
+
+model Follow {
+  followerId  Int      @map("follower_id")
+  followingId Int      @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@id([followerId, followingId])
+  @@index([followingId], map: "follows_following_idx")
+  @@map("follows")
+}
+
+model Post {
+  id          BigInt    @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  kind        String    @db.VarChar(8)
+  body        String    @default("") @db.VarChar(500)
+  visibility  String    @default("public") @db.VarChar(10)
+  betId       Int?      @map("bet_id")
+  sport       String?   @db.VarChar(60)
+  league      String?   @db.VarChar(80)
+  event       String?   @db.VarChar(180)
+  eventId     String?   @map("event_id") @db.VarChar(100)
+  marketKey   String?   @map("market_key") @db.VarChar(80)
+  betType     String?   @map("bet_type") @db.VarChar(80)
+  selection   String?   @db.VarChar(180)
+  lineValue   Decimal?  @map("line_value") @db.Decimal(10, 3)
+  odds        Decimal?  @db.Decimal(10, 3)
+  units       Decimal?  @db.Decimal(8, 2)
+  sportsbook  String?   @db.VarChar(80)
+  eventStart  DateTime? @map("event_start") @db.Timestamptz
+  locked      Boolean   @default(false)
+  result      String    @default("pending") @db.VarChar(10)
+  resultUnits Decimal?  @map("result_units") @db.Decimal(10, 2)
+  autoGraded  Boolean   @default(false) @map("auto_graded")
+  settledAt   DateTime? @map("settled_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([userId, createdAt(sort: Desc)], map: "posts_user_idx")
+  @@index([createdAt(sort: Desc)], map: "posts_created_idx")
+  @@map("posts")
+}
+
+model Comment {
+  id        BigInt   @id @default(autoincrement())
+  postId    BigInt   @map("post_id")
+  userId    Int      @map("user_id")
+  body      String   @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([postId, createdAt], map: "comments_post_idx")
+  @@map("comments")
+}
+
+model Reaction {
+  postId    BigInt   @map("post_id")
+  userId    Int      @map("user_id")
+  reaction  String   @db.VarChar(8)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@id([postId, userId, reaction])
+  @@index([createdAt(sort: Desc)], map: "reactions_created_idx")
+  @@map("reactions")
+}
+
+model Badge {
+  key         String @id @db.VarChar(30)
+  name        String @db.VarChar(60)
+  description String @db.VarChar(200)
+  icon        String @db.VarChar(30)
+  xp          Int    @default(0)
+  sortOrder   Int    @default(0) @map("sort_order")
+
+  @@map("badges")
+}
+
+model Achievement {
+  userId   Int      @map("user_id")
+  badgeKey String   @map("badge_key") @db.VarChar(30)
+  earnedAt DateTime @default(now()) @map("earned_at") @db.Timestamptz
+
+  @@id([userId, badgeKey])
+  @@map("achievements")
+}
+
+model Notification {
+  id        BigInt    @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  type      String    @db.VarChar(20)
+  title     String    @db.VarChar(200)
+  body      String    @default("") @db.VarChar(600)
+  link      Json      @default("{}")
+  dedupeKey String?   @map("dedupe_key") @db.VarChar(200)
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([userId, createdAt(sort: Desc)], map: "notifications_user_idx")
+  @@map("notifications")
+}
+
+model FeedEvent {
+  id          BigInt   @id @default(autoincrement())
+  type        String   @db.VarChar(20)
+  actorUserId Int?     @map("actor_user_id")
+  league      String?  @db.VarChar(8)
+  title       String   @db.VarChar(200)
+  body        String   @default("") @db.VarChar(600)
+  ref         Json     @default("{}")
+  dedupeKey   String?  @unique @map("dedupe_key") @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt(sort: Desc)], map: "feed_events_created_idx")
+  @@map("feed_events")
+}
+
+model LeaderboardSnapshot {
+  id         BigInt   @id @default(autoincrement())
+  metric     String   @db.VarChar(12)
+  period     String   @db.VarChar(4)
+  userId     Int      @map("user_id")
+  rank       Int
+  value      Decimal  @db.Decimal(12, 4)
+  picks      Int
+  computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz
+
+  @@index([metric, period, computedAt(sort: Desc)], map: "leaderboard_snapshots_idx")
+  @@map("leaderboard_snapshots")
+}
+
+model LiveGameEvent {
+  id        BigInt   @id @default(autoincrement())
+  league    String   @db.VarChar(8)
+  eventId   String   @map("event_id") @db.VarChar(40)
+  userId    Int      @map("user_id")
+  kind      String   @db.VarChar(8)
+  body      String?  @db.VarChar(280)
+  reaction  String?  @db.VarChar(8)
+  playId    String?  @map("play_id") @db.VarChar(40)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([league, eventId, createdAt(sort: Desc)], map: "live_game_events_game_idx")
+  @@map("live_game_events")
+}

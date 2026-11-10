@@ -15,6 +15,7 @@ import { TeamProfileView } from "../components/stats/TeamProfileView";
 import { ComparePanel, MAX_COMPARE } from "../components/stats/ComparePanel";
 import { Avatar, LoadingBlock, Segmented } from "../components/stats/StatsUi";
 import { LiveGamesPage } from "./LiveGamesPage";
+import { useNavStore } from "../lib/navStore";
 
 type Tab = "leaders" | "players" | "teams" | "compare" | "live";
 type View = { kind: "hub" } | { kind: "player"; id: string } | { kind: "team"; id: string };
@@ -43,6 +44,14 @@ export function StatsPage() {
   const [message, setMessage] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const sortedPlayers = useRef<PlayerRow[]>([]);
+  const liveTarget = useNavStore((state) => state.live);
+  useEffect(() => {
+    // Deep link from a notification: open Live games for the right league (LiveGamesPage opens the game).
+    if (!liveTarget) return;
+    setLeagueState(liveTarget.league);
+    setTab("live");
+    setView({ kind: "hub" });
+  }, [liveTarget]);
   const sortedTeams = useRef<TeamRow[]>([]);
 
   const statsQuery = useQuery({

@@ -222,7 +222,9 @@ export async function storeAlerts(drafts: Draft[]): Promise<OddsAlert[]> {
         unique.map((draft) => draft.message), unique.map((draft) => draft.severity), unique.map((draft) => draft.value),
       ],
     );
-    return result.rows.map(fromRow);
+    const stored = result.rows.map(fromRow);
+    if (stored.length) void import("./social/alertFanout.service").then(({ onAlertsStored }) => onAlertsStored(stored));
+    return stored;
   } catch (error) {
     console.warn("Odds alert write failed", error instanceof Error ? error.message : error);
     return [];

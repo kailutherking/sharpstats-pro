@@ -12,6 +12,8 @@ The Live Game Tracker (Research → Stats → Live games) follows today's NBA, N
 
 The Injury Report (Research → Injury report) lists every injury for the four leagues from ESPN's injury feeds, refreshed every 5 minutes, with filters by team, position, status, update date and search. Each injury gets a betting impact estimate (importance, team rating and win probability change, offensive, defensive, fantasy and prop impact, and teammates likely to gain usage), team health scores, a player page with history, news, practice participation and workload notes, and the spread movement on the team's next game since the report. Status changes raise alerts (ruled out, upgraded, downgraded, returning, line movement) in the Odds screen's alert feed.
 
+Community (Workspace → Community) adds a social layer around the research tools without replacing them. You can share pending tracked bets as picks; they're locked if shared before the game and verified when graded from the final score. Picks get likes, fire, lock, tail and fade reactions and comments. There are public profiles with records from shared picks (sizes in units, never dollars), follows, an activity feed (picks, big wins, injury news for players and teams you follow, sharp line moves, headlines) and leaderboards (ROI, win rate, units, props, sportsbooks). Badges, XP, levels and a daily streak reward research habits. A live notification center covers prop hits, injuries, line moves, EV, arbitrage and activity on your picks. Live games get a chat room, reactions on plays and a tracker for your own bets. See [docs/REAL_COMPETITIVE_ANALYSIS.md](./docs/REAL_COMPETITIVE_ANALYSIS.md) for the competitive analysis and roadmap.
+
 > SharpStats Pro is an analytics tool, not financial advice or a guarantee of results. Validate all odds and wager information with your sportsbook. Bet responsibly.
 
 ## Requirements
@@ -112,6 +114,8 @@ All routes are prefixed with `/api`. Except for auth and health, requests requir
 - `GET /stats/:league` (`nba`, `nfl`, `mlb`, `nhl`), `POST /stats/:league/refresh`, `GET /stats/player/:id`, `GET /stats/team/:id`, `GET|PUT /stats/favorites`
 - Live games: `GET /live-games`, `GET /live-games/:id`, `GET /live-games/player/:id`
 - Injuries: `GET /injuries`, `GET /injuries/player/:id`, `GET /injuries/team/:id`, `GET /injuries/impact`
+- Community: `GET|PUT /social/me`, `/social/profiles/:handle`, `PUT /social/follows/:handle`, `/social/feed`, `/social/picks`, `/social/posts/:id` (reactions, comments), `/social/leaderboards`, `/social/achievements`
+- Notifications and realtime: `GET /notifications`, `POST /notifications/read`, `GET|PUT /notifications/preferences`, `GET /realtime/stream` (Server-Sent Events); live game chat: `/live-games/:id/chat`, `/live-games/:id/reactions`, `/live-games/:id/my-bets`
 
 The Market Lab normalizes The Odds API prices across books, calculates no-vig consensus probabilities, identifies positive expected value and theoretical arbitrage, and records line snapshots for movement comparisons. Line movement history accrues on explicit scans (up to six scans per minute; snapshots are retained for 30 days). Player props are optional because provider market availability and API quotas vary. Configure `ODDS_API_KEY` in `.env` for current odds, historical snapshots, and supported score-based grading. Configure `SPORTRADAR_API_KEY` for the separate Sportradar schedule adapter example. Provider requests are made server-side so keys are not exposed in the browser. Review each provider's API plan, terms, and rate limits before use.
 

@@ -13,6 +13,9 @@ import profileRoutes from "./routes/profile";
 import statsRoutes from "./routes/stats.routes";
 import liveGameRoutes from "./routes/liveGame.routes";
 import injuryRoutes from "./routes/injury.routes";
+import socialRoutes from "./routes/social.routes";
+import notificationRoutes from "./routes/notifications.routes";
+import realtimeRoutes from "./routes/realtime.routes";
 import { errorHandler, notFound } from "./middleware/errors";
 
 export const app = express();
@@ -45,5 +48,8 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/live-games", liveGameRoutes);
 app.use("/api/injuries", injuryRoutes);
+app.use("/api/social", socialRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/realtime", realtimeRoutes);
 app.use(notFound);
 app.use(errorHandler);

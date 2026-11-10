@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-09
+
+### Added
+- Community page (Workspace → Community) with Feed, Picks, Leaderboards and Profile tabs, plus bettor search.
+- Share pending bets as picks from the Bet tracker. Picks snapshot odds, line and units (never dollars). They're locked when shared before the start time and verified when locked and graded from the final score. Visibility can be public, followers or private.
+- Reactions on picks and posts (like, fire, lock, tail, fade), comments and share. Tail opens the bet slip pre-filled with the pick.
+- Pick lists: popular, most tailed, trending props, sharp bettors, top winners and latest.
+- Public profiles: handle, bio, favorite sports, record from shared picks (W-L-P, units, ROI, win %, verified count), performance chart, record by sport, followers and following, badges, followed teams, players and sportsbooks, tail/fade analytics and recent picks. Profiles can be made private.
+- Follow bettors. Following teams, players and sportsbooks reuses Stats favorites and favorite sportsbooks, which now drive injury notifications and feed items.
+- Activity feed (everyone or following): picks, big wins, badges, injury news, sharp line moves and ESPN headlines with trade/signing tags.
+- Leaderboards: global and friends; units, ROI, win rate, props and sportsbooks; 7 days, 30 days and all time; minimum sample sizes and rank change.
+- Gamification: 10 badges with progress, XP, levels, ranks (Rookie to Legend), a daily streak with milestone notifications, and a dashboard progress card.
+- Notification center in the header with 14 notification types, live push, unread count, toasts, deep links and per-type preferences in Settings.
+- Live game room in the game view: chat, game reactions, reactions on individual plays, live viewer count, and your pending bets on the game tracked live. A background scan sends "prop cashed live" notifications.
+- Mobile bottom navigation bar and a first-run setup checklist on the dashboard.
+- Realtime service (`/api/realtime/stream`, Server-Sent Events) with per-user and per-game topics.
+- API: `/api/social/*`, `/api/notifications/*`, `/api/realtime/stream`, `/api/live-games/:id/chat|reactions|my-bets`.
+- Migration `003_social_engagement.sql`: `user_profiles`, `user_preferences`, `follows`, `posts`, `comments`, `reactions`, `badges`, `achievements`, `notifications`, `feed_events`, `leaderboard_snapshots`, `live_game_events`, with matching Prisma models.
+- `docs/REAL_COMPETITIVE_ANALYSIS.md`: comparison with Real Sports, feature gap audit, priority roadmap and plans.
+
+### Changed
+- Stored odds and injury alerts now also create feed events, and notifications for matching alert rules and followed players and teams.
+- Bet result changes (manual or automatic grading) update shared picks, send result or prop-hit notifications and re-check badges.
+
 ## [1.5.0] - 2026-11-09
 
 ### Added
@@ -119,7 +143,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Docker now serves the production frontend through Nginx and prunes development dependencies from the backend image.
 - Odds and analysis features are documented as quota-dependent, on-demand research rather than guaranteed predictions.
 
-[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.3.0...v1.4.0

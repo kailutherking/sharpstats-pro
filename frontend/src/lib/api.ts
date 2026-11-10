@@ -14,6 +14,7 @@ import type {
 } from "./oddsTypes";
 import type { LiveGameDetail, LiveGamesResponse, LivePlayer } from "./liveTypes";
 import type { InjuryImpactList, InjuryQuery, InjuryReport, PlayerInjuryProfile, TeamInjuries } from "./injuryTypes";
+import type { Achievements, AppNotification, BookRow, ChatMessage, CommentView, FeedFilter, FeedItem, GameChat, LeaderboardData, LeaderMetric, LeaderPeriod, LiveBet, LiveReaction, MyProfile, NotificationType, PostView, ProfileSummary, PublicProfile, Reaction, Visibility } from "./socialTypes";
 
 const API_URL = (
   import.meta.env.VITE_API_URL ||
@@ -205,5 +206,35 @@ export const api = {
   injuries: (params: InjuryQuery) => request<InjuryReport>(`/injuries${query({ ...params, status: params.status?.join(","), updated: params.updated === "all" ? undefined : params.updated })}`),
   injuryPlayer: (league: League, id: string) => request<PlayerInjuryProfile>(`/injuries/player/${encodeURIComponent(id)}${query({ league })}`),
   injuryTeam: (league: League, id: string) => request<TeamInjuries>(`/injuries/team/${encodeURIComponent(id)}${query({ league })}`),
+  socialMe: () => request<MyProfile>("/social/me"),
+  updateSocialMe: (changes: Partial<{ handle: string; bio: string; avatarUrl: string | null; favoriteSports: League[]; isPublic: boolean; onboardingDismissed: boolean }>) => request<MyProfile>("/social/me", { method: "PUT", body: JSON.stringify(changes) }),
+  achievements: () => request<Achievements>("/social/achievements"),
+  publicProfile: (handle: string) => request<PublicProfile>(`/social/profiles/${encodeURIComponent(handle)}`),
+  searchProfiles: (q: string) => request<{ profiles: ProfileSummary[] }>(`/social/profiles/search${query({ q })}`),
+  followList: (handle: string, direction: "followers" | "following") => request<{ profiles: ProfileSummary[] }>(`/social/profiles/${encodeURIComponent(handle)}/${direction}`),
+  follow: (handle: string, following: boolean) => request<{ following: boolean }>(`/social/follows/${encodeURIComponent(handle)}`, { method: "PUT", body: JSON.stringify({ following }) }),
+  feed: (scope: "following" | "all", filter: FeedFilter, league?: League) => request<{ items: FeedItem[] }>(`/social/feed${query({ scope, filter, league })}`),
+  picks: (sort: string, scope: "following" | "all" = "all") => request<{ picks: PostView[] }>(`/social/picks${query({ sort, scope })}`),
+  sharedBets: () => request<{ shared: Record<string, number> }>("/social/picks/shared-bets"),
+  sharePick: (betId: number, body: string, visibility: Visibility) => request<{ post: PostView }>("/social/picks", { method: "POST", body: JSON.stringify({ betId, body, visibility }) }),
+  createPost: (body: string, visibility: Visibility) => request<{ post: PostView }>("/social/posts", { method: "POST", body: JSON.stringify({ body, visibility }) }),
+  post: (id: number) => request<{ post: PostView }>(`/social/posts/${id}`),
+  deletePost: (id: number) => request<void>(`/social/posts/${id}`, { method: "DELETE" }),
+  react: (id: number, reaction: Reaction, enabled: boolean) => request<{ post: PostView }>(`/social/posts/${id}/reactions`, { method: "PUT", body: JSON.stringify({ reaction, enabled }) }),
+  comments: (id: number) => request<{ comments: CommentView[] }>(`/social/posts/${id}/comments`),
+  addComment: (id: number, body: string) => request<{ comment: CommentView }>(`/social/posts/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
+  deleteComment: (id: number) => request<void>(`/social/comments/${id}`, { method: "DELETE" }),
+  leaderboard: (metric: LeaderMetric, period: LeaderPeriod, scope: "global" | "following") => request<LeaderboardData>(`/social/leaderboards${query({ metric, period, scope })}`),
+  bookLeaderboard: (period: LeaderPeriod) => request<{ period: LeaderPeriod; books: BookRow[] }>(`/social/leaderboards/sportsbooks${query({ period })}`),
+  notifications: (limit = 30) => request<{ notifications: AppNotification[]; unread: number }>(`/notifications${query({ limit })}`),
+  markNotificationsRead: (ids: number[] | "all") => request<{ updated: number }>("/notifications/read", { method: "POST", body: JSON.stringify(ids === "all" ? { all: true } : { ids }) }),
+  notificationPreferences: () => request<{ preferences: Record<NotificationType, boolean> }>("/notifications/preferences"),
+  setNotificationPreferences: (changes: Partial<Record<NotificationType, boolean>>) => request<{ preferences: Record<NotificationType, boolean> }>("/notifications/preferences", { method: "PUT", body: JSON.stringify(changes) }),
+  realtimeStream: (topic: string | null, signal: AbortSignal) => stream(`/realtime/stream${query({ topic })}`, signal),
+  gameChat: (league: League, id: string) => request<GameChat>(`/live-games/${encodeURIComponent(id)}/chat${query({ league })}`),
+  sendChat: (league: League, id: string, body: string) => request<{ message: ChatMessage }>(`/live-games/${encodeURIComponent(id)}/chat`, { method: "POST", body: JSON.stringify({ league, body }) }),
+  reactLive: (league: League, id: string, reaction: LiveReaction, playId?: string | null) => request<{ added: boolean }>(`/live-games/${encodeURIComponent(id)}/reactions`, { method: "POST", body: JSON.stringify({ league, reaction, playId: playId ?? null }) }),
+  deleteChat: (messageId: number) => request<void>(`/live-games/chat/${messageId}`, { method: "DELETE" }),
+  myLiveBets: (league: League, id: string) => request<{ bets: LiveBet[] }>(`/live-games/${encodeURIComponent(id)}/my-bets${query({ league })}`),
   injuryImpact: (league: League, min?: number, limit?: number) => request<InjuryImpactList>(`/injuries/impact${query({ league, min, limit })}`),
 };
