@@ -390,3 +390,165 @@ model OddsFavorite {
   @@id([userId, kind, itemKey])
   @@map("odds_favorites")
 }
+
+/// Live game tracker and injury intelligence: applied by src/db/migrations/002_live_games_injuries.sql.
+model Game {
+  league       String   @db.VarChar(8)
+  eventId      String   @map("event_id") @db.VarChar(40)
+  name         String   @db.VarChar(200)
+  shortName    String   @map("short_name") @db.VarChar(40)
+  startTime    DateTime @map("start_time") @db.Timestamptz
+  status       String   @db.VarChar(12)
+  statusDetail String   @default("") @map("status_detail") @db.VarChar(80)
+  homeTeamId   String   @map("home_team_id") @db.VarChar(20)
+  awayTeamId   String   @map("away_team_id") @db.VarChar(20)
+  homeTeam     String   @map("home_team") @db.VarChar(120)
+  awayTeam     String   @map("away_team") @db.VarChar(120)
+  homeAbbr     String   @default("") @map("home_abbr") @db.VarChar(12)
+  awayAbbr     String   @default("") @map("away_abbr") @db.VarChar(12)
+  oddsGameId   String?  @map("odds_game_id") @db.VarChar(100)
+  firstSeenAt  DateTime @default(now()) @map("first_seen_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@id([league, eventId])
+  @@index([league, startTime], map: "games_start_idx")
+  @@map("games")
+}
+
+model LiveScore {
+  id                 BigInt   @id @default(autoincrement())
+  league             String   @db.VarChar(8)
+  eventId            String   @map("event_id") @db.VarChar(40)
+  status             String   @db.VarChar(12)
+  period             Int      @default(0)
+  clock              String?  @db.VarChar(12)
+  homeScore          Int?     @map("home_score")
+  awayScore          Int?     @map("away_score")
+  possessionTeamId   String?  @map("possession_team_id") @db.VarChar(20)
+  homeWinProbability Decimal? @map("home_win_probability") @db.Decimal(6, 4)
+  situation          Json     @default("{}")
+  recordedAt         DateTime @default(now()) @map("recorded_at") @db.Timestamptz
+
+  @@index([league, eventId, recordedAt], map: "live_scores_event_idx")
+  @@map("live_scores")
+}
+
+model PlayerGameStat {
+  league     String   @db.VarChar(8)
+  eventId    String   @map("event_id") @db.VarChar(40)
+  playerId   String   @map("player_id") @db.VarChar(20)
+  statGroup  String   @map("stat_group") @db.VarChar(20)
+  teamId     String   @map("team_id") @db.VarChar(20)
+  playerName String   @map("player_name") @db.VarChar(120)
+  position   String   @default("") @db.VarChar(8)
+  stats      Json     @default("{}")
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@id([league, eventId, playerId, statGroup])
+  @@index([league, playerId], map: "player_game_stats_player_idx")
+  @@map("player_game_stats")
+}
+
+model LiveOddsSnapshot {
+  id            BigInt   @id @default(autoincrement())
+  league        String   @db.VarChar(8)
+  eventId       String   @map("event_id") @db.VarChar(40)
+  oddsGameId    String?  @map("odds_game_id") @db.VarChar(100)
+  marketKey     String   @map("market_key") @db.VarChar(20)
+  side          String   @db.VarChar(8)
+  point         Decimal? @db.Decimal(10, 2)
+  priceAmerican Int      @map("price_american")
+  source        String   @db.VarChar(12)
+  recordedAt    DateTime @default(now()) @map("recorded_at") @db.Timestamptz
+
+  @@index([league, eventId, recordedAt], map: "live_odds_snapshots_event_idx")
+  @@map("live_odds_snapshots")
+}
+
+model Injury {
+  league          String    @db.VarChar(8)
+  athleteId       String    @map("athlete_id") @db.VarChar(20)
+  playerName      String    @map("player_name") @db.VarChar(120)
+  teamId          String    @map("team_id") @db.VarChar(20)
+  teamName        String    @map("team_name") @db.VarChar(120)
+  teamAbbr        String    @default("") @map("team_abbr") @db.VarChar(12)
+  position        String    @default("") @db.VarChar(8)
+  status          String    @db.VarChar(24)
+  providerStatus  String    @default("") @map("provider_status") @db.VarChar(40)
+  injuryType      String?   @map("injury_type") @db.VarChar(80)
+  bodyLocation    String?   @map("body_location") @db.VarChar(60)
+  injuryDetail    String?   @map("injury_detail") @db.VarChar(80)
+  side            String?   @db.VarChar(20)
+  returnDate      DateTime? @map("return_date") @db.Date
+  shortComment    String    @default("") @map("short_comment")
+  longComment     String    @default("") @map("long_comment")
+  reportedAt      DateTime  @map("reported_at") @db.Timestamptz
+  firstReportedAt DateTime  @map("first_reported_at") @db.Timestamptz
+  source          String    @default("ESPN") @db.VarChar(40)
+  headshot        String?   @db.VarChar(300)
+  importance      Int?
+  active          Boolean   @default(true)
+  clearedAt       DateTime? @map("cleared_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@id([league, athleteId])
+  @@map("injuries")
+}
+
+model InjuryHistory {
+  id             BigInt    @id @default(autoincrement())
+  league         String    @db.VarChar(8)
+  athleteId      String    @map("athlete_id") @db.VarChar(20)
+  playerName     String    @map("player_name") @db.VarChar(120)
+  teamId         String    @map("team_id") @db.VarChar(20)
+  status         String    @db.VarChar(24)
+  previousStatus String?   @map("previous_status") @db.VarChar(24)
+  injuryType     String?   @map("injury_type") @db.VarChar(80)
+  bodyLocation   String?   @map("body_location") @db.VarChar(60)
+  returnDate     DateTime? @map("return_date") @db.Date
+  comment        String?
+  reportedAt     DateTime  @map("reported_at") @db.Timestamptz
+  recordedAt     DateTime  @default(now()) @map("recorded_at") @db.Timestamptz
+
+  @@index([league, athleteId, recordedAt(sort: Desc)], map: "injury_history_player_idx")
+  @@map("injury_history")
+}
+
+model InjuryImpact {
+  league          String   @db.VarChar(8)
+  athleteId       String   @map("athlete_id") @db.VarChar(20)
+  status          String   @db.VarChar(24)
+  importance      Int
+  tier            String   @db.VarChar(12)
+  projectedImpact Int      @map("projected_impact")
+  ratingChange    Decimal  @map("rating_change") @db.Decimal(8, 2)
+  ratingUnit      String   @map("rating_unit") @db.VarChar(8)
+  winImpact       Decimal  @map("win_impact") @db.Decimal(8, 4)
+  offensiveChange Decimal  @map("offensive_change") @db.Decimal(8, 2)
+  defensiveChange Decimal  @map("defensive_change") @db.Decimal(8, 2)
+  fantasyPerGame  Decimal? @map("fantasy_per_game") @db.Decimal(8, 2)
+  propLevel       String   @map("prop_level") @db.VarChar(12)
+  basis           String   @default("")
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@id([league, athleteId])
+  @@map("injury_impact")
+}
+
+model TeamHealth {
+  id                BigInt   @id @default(autoincrement())
+  league            String   @db.VarChar(8)
+  teamId            String   @map("team_id") @db.VarChar(20)
+  teamName          String   @map("team_name") @db.VarChar(120)
+  healthScore       Int      @map("health_score")
+  label             String   @db.VarChar(20)
+  activeInjuries    Int      @default(0) @map("active_injuries")
+  outCount          Int      @default(0) @map("out_count")
+  questionableCount Int      @default(0) @map("questionable_count")
+  returningCount    Int      @default(0) @map("returning_count")
+  suspendedCount    Int      @default(0) @map("suspended_count")
+  recordedAt        DateTime @default(now()) @map("recorded_at") @db.Timestamptz
+
+  @@index([league, teamId, recordedAt(sort: Desc)], map: "team_health_team_idx")
+  @@map("team_health")
+}

@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-09
+
+### Added
+- Live Game Tracker (Stats → Live games) for the NBA, NFL, MLB and NHL. It refreshes every 15 seconds and has a manual refresh and a last-updated time. Each game shows status (pregame, live, halftime, end of quarter/period, final), clock, period or inning, possession, score, win probability and live moneyline, spread and total.
+- Sport-specific live panels: NBA timeouts, team fouls and bonus; NFL down and distance and a red-zone flag; MLB balls, strikes, outs, base runners and pitcher/batter (pitch counts in the box score); NHL shots on goal, power play (NHL official API) and recent penalties.
+- Game view with linescore, win probability chart, live team stats, player leaders, a box score by stat group, recent plays and a sportsbook comparison. The comparison shows current, opening and closing odds, movement from open, coverage for the eight tracked books, on-demand quarter markets and props, and ESPN's DraftKings opening and latest lines.
+- Live player tracker: current game stats, projected finish, pace, hit probability, over progress and under cushion for each prop stat. Lines come from sportsbook props or can be entered by hand.
+- Injury Report page (Research → Injury report, under Stats) with ESPN injury feeds for all four leagues. Filters by team, position, status, date updated and search. The table shows player, team, position, injury, status, expected return, last updated, source and impact.
+- Injury betting impact model: importance, team rating change, projected and win impact, offensive, defensive, fantasy and prop impact, and teammates likely to gain usage.
+- Team health dashboard showing active, questionable, returning and suspended players and a 0–100 health score.
+- Player injury page: injury details, first-reported date, recorded history, recent news, practice participation and workload restrictions taken from the report notes, and the spread before vs. now on the team's next game.
+- Injury alerts in the Odds screen alert feed: player ruled out, questionable upgraded or downgraded, return announcements and line-movement correlation. There is also an "Injury impact" tab on the Odds screen.
+- API: `GET /api/live-games`, `/api/live-games/:id`, `/api/live-games/player/:id`, `/api/injuries`, `/api/injuries/player/:id`, `/api/injuries/team/:id`, `/api/injuries/impact`.
+- Migration `002_live_games_injuries.sql`: `games`, `live_scores`, `player_game_stats`, `live_odds_snapshots`, `injuries`, `injury_history`, `injury_impact`, `team_health` (with matching Prisma models).
+- Settings `INJURY_REFRESH_MINUTES`, `LIVE_PROVIDER_TIMEOUT_MS`, `NHL_API_URL`.
+
+### Changed
+- After a server restart, the live tracker uses ESPN's DraftKings lines until the next credit-paced odds refresh is due, instead of buying an immediate refresh.
+
 ## [1.4.1] - 2026-11-08
 
 ### Added
@@ -100,7 +119,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Docker now serves the production frontend through Nginx and prunes development dependencies from the backend image.
 - Odds and analysis features are documented as quota-dependent, on-demand research rather than guaranteed predictions.
 
-[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.2.0...v1.3.0

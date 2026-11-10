@@ -11,6 +11,8 @@ import oddsRoutes from "./routes/odds";
 import oddsPlatformRoutes from "./routes/odds.routes";
 import profileRoutes from "./routes/profile";
 import statsRoutes from "./routes/stats.routes";
+import liveGameRoutes from "./routes/liveGame.routes";
+import injuryRoutes from "./routes/injury.routes";
 import { errorHandler, notFound } from "./middleware/errors";
 
 export const app = express();
@@ -41,5 +43,7 @@ app.use("/api/odds", oddsPlatformRoutes);
 app.use("/api", oddsRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/live-games", liveGameRoutes);
+app.use("/api/injuries", injuryRoutes);
 app.use(notFound);
 app.use(errorHandler);

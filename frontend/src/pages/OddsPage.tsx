@@ -20,11 +20,12 @@ import { ALERT_LABELS, AlertsPanel } from "../components/odds/AlertsPanel";
 import { ClvTracker } from "../components/odds/ClvTracker";
 import { GameDrawer } from "../components/odds/GameDrawer";
 import { bookName, Notice } from "../components/odds/OddsUi";
+import { InjuryImpactPanel } from "../components/injuries/InjuryImpactPanel";
 
-type Tab = "board" | "shop" | "ev" | "arbitrage" | "props" | "movement" | "alerts" | "clv";
+type Tab = "board" | "shop" | "ev" | "arbitrage" | "props" | "movement" | "injuries" | "alerts" | "clv";
 const TABS: Array<{ value: Tab; label: string }> = [
   { value: "board", label: "Market board" }, { value: "shop", label: "Line shopping" }, { value: "ev", label: "+EV scanner" },
-  { value: "arbitrage", label: "Arbitrage" }, { value: "props", label: "Player props" }, { value: "movement", label: "Line movement" },
+  { value: "arbitrage", label: "Arbitrage" }, { value: "props", label: "Player props" }, { value: "movement", label: "Line movement" }, { value: "injuries", label: "Injury impact" },
   { value: "alerts", label: "Alerts" }, { value: "clv", label: "CLV tracker" },
 ];
 const SPORTS: Array<{ value: OddsSport; label: string }> = [{ value: "nba", label: "NBA" }, { value: "nfl", label: "NFL" }, { value: "mlb", label: "MLB" }, { value: "nhl", label: "NHL" }];
@@ -273,7 +274,7 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
         <Segmented label="League" value={sport} onChange={setSport} options={SPORTS} />
         <OddsSearch value={search} onChange={setSearch} onPick={pickSearch} />
       </div>
-      {tab !== "props" && tab !== "alerts" && tab !== "clv" && (
+      {tab !== "props" && tab !== "alerts" && tab !== "clv" && tab !== "injuries" && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <OddsFilters value={filters} onChange={setFilters} markets={data?.markets ?? []} books={books} keyless={keyless} />
           {filters.market && (
@@ -284,7 +285,7 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
           )}
         </div>
       )}
-      {favoriteMarkets.length > 0 && tab !== "props" && tab !== "alerts" && tab !== "clv" && (
+      {favoriteMarkets.length > 0 && tab !== "props" && tab !== "alerts" && tab !== "clv" && tab !== "injuries" && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[10px] font-semibold tracking-wider text-[#738087]">FAVORITE MARKETS</span>
           {favoriteMarkets.map((item) => {
@@ -324,12 +325,16 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
               onOpen={openSelection} />
           )}
           {tab === "movement" && <MovementView data={movement.data?.sport === sport ? movement.data : undefined} books={books} loading={movement.isLoading} onOpen={openSelection} />}
+          {tab === "injuries" && <InjuryImpactPanel league={sport} limit={20} />}
           {tab === "alerts" && (
             <AlertsPanel alerts={alerts.data?.alerts ?? []} rules={rules} sport={sport} markets={data.markets} books={books} mine={alertsMine} onMine={setAlertsMine}
               onCreate={async (rule: AlertRuleInput) => { await api.createAlertRule(rule); await queryClient.invalidateQueries({ queryKey: ["odds-alerts"] }); setMessage("Alert rule created."); }}
               onToggle={(rule) => void api.updateAlertRule(rule.id, !rule.active).then(() => queryClient.invalidateQueries({ queryKey: ["odds-alerts"] })).catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Could not update rule"))}
               onDelete={(rule) => void api.deleteAlertRule(rule.id).then(() => queryClient.invalidateQueries({ queryKey: ["odds-alerts"] })).catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Could not delete rule"))}
-              onOpen={(alert) => { if (alert.sideId) openSelection(alert.sideId); else setGameFor(alert.gameId); }} />
+              onOpen={(alert) => {
+                if (alert.type.startsWith("injury")) { if (games.has(alert.gameId)) setGameFor(alert.gameId); else setTab("injuries"); return; }
+                if (alert.sideId) openSelection(alert.sideId); else setGameFor(alert.gameId);
+              }} />
           )}
           {tab === "clv" && <ClvTracker data={clv.data} loading={clv.isLoading} />}
           <p className="mt-4 text-[10px] text-muted">Source: {data.status.label}. {data.status.notes.filter((note) => !note.startsWith("Keyless") && !note.startsWith("Credit pacing") && note !== data.status.warning).join(" ")} Odds are informational; confirm prices with the sportsbook before wagering.</p>
