@@ -140,7 +140,7 @@ async function mapLimit<T, R>(items: T[], limit: number, task: (item: T) => Prom
   return results;
 }
 
-function detailCached(league: League, eventId: string, force = false) {
+export function detailCached(league: League, eventId: string, force = false) {
   return cached(`live:detail:${league}:${eventId}`, DETAIL_TTL_MS, () => fetchGameDetail(league, eventId), { force });
 }
 
@@ -562,7 +562,7 @@ export interface LivePlayerResponse {
   fetchedAt: string;
 }
 
-const normalizeName = (name: string) => name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, "").replace(/[^a-z]/g, "");
+export const normalizeName = (name: string) => name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, "").replace(/[^a-z]/g, "");
 
 export async function getLivePlayer(league: League, eventId: string, playerId: string, overrides: { stat?: string; line?: number } = {}): Promise<LivePlayerResponse> {
   const detail = await detailCached(league, eventId).catch(() => { throw new NotFoundError("Game not found"); });

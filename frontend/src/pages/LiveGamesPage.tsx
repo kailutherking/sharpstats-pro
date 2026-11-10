@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, YAxis } from "recharts";
@@ -13,6 +13,8 @@ import { LineCells, LiveGameCard, SituationStrip } from "../components/live/Live
 import { LiveOddsPanel } from "../components/live/LiveOddsPanel";
 import { LivePlayerTracker } from "../components/live/LivePlayerTracker";
 import { StatusBadge, WinBar } from "../components/live/liveUi";
+import { LiveGameChat, PlayReactions } from "../components/live/LiveGameChat";
+import { useNavStore } from "../lib/navStore";
 
 const REFRESH_MS = 15_000;
 const PERIOD_NAMES: Record<League, string> = { nba: "Q", nfl: "Q", mlb: "", nhl: "P" };
@@ -188,10 +190,11 @@ function GameDetailView({ league, gameId, onBack }: { league: League; gameId: st
       <Panel title="Box score" subtitle="Player current stats · tap a name for projected finish and prop tracking" action={<Segmented label="Team" value={side} onChange={setSide} options={[{ value: "away", label: game.away.abbr }, { value: "home", label: game.home.abbr }]} />} flush>
         {teamBox?.groups.length ? teamBox.groups.filter((group) => MAIN_GROUPS.has(group.key)).map((group) => <div key={group.key} className="border-b border-line last:border-0"><BoxTable group={group} onPlayer={setPlayer} /></div>) : <EmptyState>The box score fills in once the game starts.</EmptyState>}
       </Panel>
+      <LiveGameChat league={league} gameId={gameId} live={inProgress(game.status)} />
       <LiveOddsPanel odds={data.odds} game={game} league={league} onLoadMarkets={() => void loadMarkets()} loadingMarkets={loadingMarkets} />
       {data.plays.length > 0 && (
         <Panel title="Recent plays">
-          <ul className="space-y-1.5">{data.plays.map((play) => <li key={play.id} className={`flex gap-3 text-[11px] ${play.scoring ? "text-white" : "text-[#a2abad]"}`}><span className="w-16 shrink-0 tabular-nums text-muted">{play.period ? `${game.league === "mlb" ? "Inn" : game.league === "nhl" ? "P" : "Q"}${play.period}` : ""} {play.clock ?? ""}</span><span>{play.scoring && <span className="mr-1 text-lime">●</span>}{play.text}</span></li>)}</ul>
+          <ul className="space-y-1.5">{data.plays.map((play) => <li key={play.id} className={`flex gap-3 text-[11px] ${play.scoring ? "text-white" : "text-[#a2abad]"}`}><span className="w-16 shrink-0 tabular-nums text-muted">{play.period ? `${game.league === "mlb" ? "Inn" : game.league === "nhl" ? "P" : "Q"}${play.period}` : ""} {play.clock ?? ""}</span><span>{play.scoring && <span className="mr-1 text-lime">●</span>}{play.text}{play.id && <PlayReactions league={league} gameId={gameId} playId={play.id} />}</span></li>)}</ul>
         </Panel>
       )}
       <p className="text-[10px] text-[#69757a]">Source: {data.source}. Live data refreshes every {data.refreshSeconds} seconds while a game is in progress. Informational only.</p>
@@ -215,6 +218,11 @@ export function LiveGamesPage({ league }: { league: League }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<GameFilter>("all");
   const [selected, setSelected] = useState<string | null>(null);
+  const liveTarget = useNavStore((state) => state.live);
+  const consumeLive = useNavStore((state) => state.consumeLive);
+  useEffect(() => {
+    if (liveTarget && liveTarget.league === league) { setSelected(liveTarget.gameId); consumeLive(); }
+  }, [liveTarget, league, consumeLive]);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState("");
   const list = useQuery({

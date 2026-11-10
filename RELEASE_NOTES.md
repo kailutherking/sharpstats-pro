@@ -1,5 +1,38 @@
 # Release notes
 
+## SharpStats Pro 1.6.0
+
+**Version:** 1.6.0
+**Release date:** 2026-11-09
+
+### Features added
+- **Community:**
+  - Share your pending bets as picks, with verified records, reactions (like, fire, lock, tail, fade), comments and share.
+  - Tail opens the bet slip pre-filled with the pick.
+- **Profiles and follows:** public profiles with your pick record, ROI, units, badges and performance chart. Follow bettors; teams and players you favorite in Stats now power injury alerts and your feed.
+- **Activity feed:** picks, big wins, injury news, sharp line moves and headlines in one place.
+- **Leaderboards:** global and friends, by units, ROI, win rate, props and sportsbook.
+- **Badges, XP, levels and daily streaks** that reward research habits.
+- **Notification center:** prop hits, bet results, injury updates, line moves, EV, arbitrage, new followers and activity on your picks, delivered live. Turn each type on or off in Settings.
+- **Live game room:** chat, emoji reactions on the game and on individual plays, and your bets on that game tracked live.
+- **Mobile:** a bottom navigation bar and a setup checklist for new accounts.
+
+### Bug fixes
+- The notification bell was a placeholder; it now shows real notifications.
+
+### Performance improvements
+- Feeds and leaderboards are single SQL queries. Headlines are cached for 10 minutes. Live updates arrive by push instead of polling.
+
+### Breaking changes
+- None. The new tables are created by migration `003` on startup.
+
+### Known issues
+- **Leaderboards and pick lists need users:** they fill in as people share picks, and rate leaderboards need 5–10 settled picks per bettor.
+- **Verified records** need bets logged from the Odds screen (so start times are known) and automatic grading.
+- **No avatar uploads:** profile photos are HTTPS URLs for now.
+- **Not yet built:** groups/circles, web push, email digests, a dedicated news hub and a trade feed (see the roadmap in `docs/REAL_COMPETITIVE_ANALYSIS.md`).
+- **Real-time** uses Server-Sent Events rather than WebSockets (see the realtime plan in the same doc).
+
 ## SharpStats Pro 1.5.0
 
 **Version:** 1.5.0

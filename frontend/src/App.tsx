@@ -2,9 +2,9 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react
 import type { FormEvent, ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Activity, ArrowDownToLine, ArrowUpRight, BarChart3, Bell, Bookmark, BrainCircuit, Calculator, CircleHelp,
+  Activity, ArrowDownToLine, ArrowUpRight, BarChart3, Bookmark, BrainCircuit, Calculator, CircleHelp,
   Compass, FileSpreadsheet, Gauge, HeartPulse, LayoutDashboard, LogOut, Menu, Moon, Plus, Search, Settings2,
-  ShieldAlert, Sparkles, Sun, Target, Trophy, Wallet, X, Zap,
+  ShieldAlert, Share2, Sparkles, Sun, Target, Trophy, Users, Wallet, X, Zap,
 } from "lucide-react";
 import { api, tokenStore } from "./lib/api";
 import type { Bet, Performance, Summary, User } from "./lib/types";
@@ -13,16 +13,27 @@ import { StatCard } from "./components/StatCard";
 import { BetModal } from "./components/BetModal";
 import { MarketLab } from "./components/MarketLab";
 import { useAuthStore } from "./lib/authStore";
+import { useNavStore } from "./lib/navStore";
+import type { NotificationLink, PostView } from "./lib/socialTypes";
+import type { League } from "./lib/statsTypes";
+import { NotificationCenter } from "./components/social/NotificationCenter";
+import { OnboardingChecklist } from "./components/social/OnboardingChecklist";
+import { ActivityFeed } from "./components/social/ActivityFeed";
+import { SharePickModal } from "./components/social/SharePickModal";
+import { SocialSettings } from "./components/social/SocialSettings";
+import { XpBar } from "./components/social/socialUi";
 
 const StatsPage = lazy(() => import("./pages/StatsPage").then((module) => ({ default: module.StatsPage })));
 const OddsPage = lazy(() => import("./pages/OddsPage").then((module) => ({ default: module.OddsPage })));
+const CommunityPage = lazy(() => import("./pages/CommunityPage").then((module) => ({ default: module.CommunityPage })));
 const InjuryReportPage = lazy(() => import("./pages/InjuryReportPage").then((module) => ({ default: module.InjuryReportPage })));
 
-type Page = "Overview" | "Bet tracker" | "Analytics" | "Odds screen" | "Stats" | "Injury report" | "Market lab" | "Parlay builder" | "Bankroll" | "Pick analysis" | "Settings";
+type Page = "Overview" | "Bet tracker" | "Analytics" | "Community" | "Odds screen" | "Stats" | "Injury report" | "Market lab" | "Parlay builder" | "Bankroll" | "Pick analysis" | "Settings";
 const navigation: { name: Page; icon: typeof LayoutDashboard; section: string }[] = [
   { name: "Overview", icon: LayoutDashboard, section: "WORKSPACE" },
   { name: "Bet tracker", icon: FileSpreadsheet, section: "WORKSPACE" },
   { name: "Analytics", icon: BarChart3, section: "WORKSPACE" },
+  { name: "Community", icon: Users, section: "WORKSPACE" },
   { name: "Odds screen", icon: Compass, section: "RESEARCH" },
   { name: "Stats", icon: Trophy, section: "RESEARCH" },
   { name: "Injury report", icon: HeartPulse, section: "RESEARCH" },
@@ -83,10 +94,14 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dark, setDark] = useState(true);
   const [range, setRange] = useState<"weekly" | "monthly">("monthly");
-  const [notificationOpen, setNotificationOpen] = useState(false);
+  const navPage = useNavStore((state) => state.page);
+  const consumePage = useNavStore((state) => state.consumePage);
+  const go = useNavStore((state) => state.go);
   const summaryQuery = useQuery({ queryKey: ["summary"], queryFn: api.summary, enabled: Boolean(user) });
   const performanceQuery = useQuery({ queryKey: ["performance"], queryFn: api.performance, enabled: Boolean(user) });
   const betsQuery = useQuery({ queryKey: ["bets", search], queryFn: () => api.bets(search), enabled: Boolean(user) });
+  const meQuery = useQuery({ queryKey: ["social-me"], queryFn: api.socialMe, enabled: Boolean(user), staleTime: 60_000 });
+  const me = meQuery.data ?? null;
   const summary = summaryQuery.data ?? null;
   const performance = performanceQuery.data ?? null;
   const bets = useMemo(() => betsQuery.data?.bets ?? [], [betsQuery.data]);
@@ -112,6 +127,26 @@ function App() {
   }, [clearSession]);
 
   const latestBets = useMemo(() => bets.slice(0, 5), [bets]);
+  useEffect(() => {
+    if (!navPage) return;
+    setPage(navPage as Page);
+    setMenuOpen(false);
+    consumePage();
+    window.scrollTo({ top: 0 });
+  }, [navPage, consumePage]);
+  /** Routes notification and feed links to the right page (and game, profile or post). */
+  const navigate = useCallback((link: NotificationLink) => {
+    const target = (link.page ?? "Overview") as Page;
+    if (target === "Community") go("Community", { community: { handle: link.handle, postId: link.postId } });
+    else if (target === "Stats" && link.league && link.gameId) go("Stats", { live: { league: link.league as League, gameId: link.gameId } });
+    else go(target);
+  }, [go]);
+  const tail = useCallback((post: PostView) => {
+    const pick = post.pick;
+    if (!pick) return;
+    setBetDraft({ event: pick.event ?? "", sport: pick.sport ?? "", league: pick.league ?? "", bet_type: pick.betType ?? "Moneyline", team_player: pick.selection ?? "", selection: pick.selection ?? "", odds: pick.odds ?? 2, sportsbook: pick.sportsbook ?? "", market_key: pick.market ?? "h2h", line_value: pick.line, event_id: pick.eventId, notes: `Tailed @${post.author.handle}` });
+    setBetModal(true);
+  }, []);
   function loggedIn(nextUser: User, token: string) { tokenStore.set(token); setUser(nextUser); }
   function logout() {
     void api.logout().catch(() => undefined).finally(() => {
@@ -146,14 +181,15 @@ function App() {
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="relative hidden w-52 md:block"><Search className="absolute left-3 top-2.5 text-muted" size={15} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search bets..." className="w-full rounded-lg border border-line bg-[#11171b] py-2 pl-9 pr-12 text-xs outline-none focus:border-[#536048]" /><kbd className="absolute right-2 top-2 rounded border border-line px-1 text-[9px] text-muted">⌘ K</kbd></div>
           <button onClick={() => setDark(!dark)} className="rounded-lg p-2 text-muted hover:bg-white/5 hover:text-white" aria-label="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
-          <div className="relative"><button onClick={() => setNotificationOpen(!notificationOpen)} className="relative rounded-lg p-2 text-muted hover:bg-white/5 hover:text-white" aria-label="Notifications"><Bell size={17} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-lime" /></button>{notificationOpen && <div className="absolute right-0 top-12 z-30 w-64 rounded-xl border border-line bg-panel p-4 shadow-xl"><p className="text-sm font-semibold">You’re all caught up</p><p className="mt-1 text-xs text-muted">New performance alerts will show here.</p></div>}</div>
-          <div className="ml-1 hidden h-8 w-8 items-center justify-center rounded-full bg-[#31402c] text-xs font-bold text-lime sm:flex">{user.username.slice(0, 1).toUpperCase()}</div>
+          <NotificationCenter onNavigate={navigate} />
+          <button type="button" onClick={() => go("Community", { community: { tab: "profile" } })} title={me ? `@${me.handle} · level ${me.level}` : "My profile"} aria-label="My profile" className="ml-1 hidden h-8 w-8 items-center justify-center rounded-full bg-[#31402c] text-xs font-bold text-lime sm:flex">{user.username.slice(0, 1).toUpperCase()}</button>
         </div>
       </header>
       {error && <div className="mx-4 mt-4 rounded-xl border border-rose-900/60 bg-rose-950/30 px-4 py-3 text-sm text-rose-300 sm:mx-8">{error} <button onClick={() => void refresh()} className="ml-2 underline">Retry</button></div>}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8 lg:px-9">
+      <div className="mx-auto max-w-[1500px] px-4 pb-24 pt-6 sm:px-7 sm:pt-8 lg:px-9 lg:pb-8">
         {page === "Overview" && <section>
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#36412d] bg-[#192017] px-2.5 py-1 text-[10px] font-semibold text-lime"><span className="h-1.5 w-1.5 rounded-full bg-lime" />LIVE DASHBOARD</div><h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-[30px]">Good morning, {user.username.split(" ")[0]} <span>👋</span></h2><p className="mt-1.5 text-sm text-muted">Here’s your betting performance at a glance.</p></div><button onClick={() => setBetModal(true)} className="flex items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-xs font-bold text-[#11170c] transition hover:bg-[#d4ff85]"><Plus size={16} />Log a bet</button></div>
+          {me && <OnboardingChecklist me={me} onGo={(target) => go(target)} onDismiss={() => void api.updateSocialMe({ onboardingDismissed: true }).then((next) => queryClient.setQueryData(["social-me"], next))} />}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
             <StatCard title="Net profit" value={currency(summary?.total_pl ?? 0)} note="All-time settled bets" icon={<ArrowUpRight size={18} />} positive={Number(summary?.total_pl ?? 0) >= 0} />
             <StatCard title="Return on investment" value={percent(summary?.roi ?? 0)} note="Yield on settled stake" icon={<Activity size={18} />} positive={(summary?.roi ?? 0) >= 0} />
@@ -168,9 +204,14 @@ function App() {
             <div className="overflow-hidden rounded-2xl border border-line bg-panel"><div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-5"><div><p className="text-sm font-semibold">Recent bets</p><p className="mt-1 text-[11px] text-muted">Your latest tracked wagers</p></div><button onClick={() => setPage("Bet tracker")} className="text-[11px] font-semibold text-lime">View all <span>→</span></button></div><BetTable bets={latestBets} onResult={async (bet, result) => { await api.updateBet(bet.id, { result }); await refresh(); }} /></div>
             <div className="rounded-2xl border border-line bg-panel p-4 sm:p-5"><div className="flex items-center gap-2"><Sparkles size={16} className="text-lime" /><p className="text-sm font-semibold">Sharp insights</p></div><p className="mt-1 text-[11px] text-muted">Patterns from your results</p><div className="mt-5 space-y-3"><Insight icon={<Zap size={15} />} title="Best sport" body={performance?.bySport[0] ? `${performance.bySport[0].name} leads your settled betting record.` : "Settle more bets to see sport-level trends."} /><Insight icon={<ShieldAlert size={15} />} title="Risk check" body={Number(summary?.risk_exposure ?? 0) > Number(summary?.bankroll.current_bankroll ?? 0) * 0.2 ? "Open stakes are above 20% of your bankroll." : "Your open exposure is within a conservative range."} warning={Number(summary?.risk_exposure ?? 0) > Number(summary?.bankroll.current_bankroll ?? 0) * 0.2} /><Insight icon={<Target size={15} />} title="Stay consistent" body={`Your average price is ${Number(summary?.average_odds ?? 0).toFixed(2)} decimal odds.`} /></div><button onClick={() => setPage("Analytics")} className="mt-5 w-full rounded-lg border border-line py-2.5 text-xs font-semibold text-[#c5f467] hover:bg-white/[0.03]">Explore analytics</button></div>
           </div>
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(280px,0.8fr)]">
+            <div className="rounded-2xl border border-line bg-panel p-4 sm:p-5"><div className="mb-4 flex items-center justify-between"><div><p className="text-sm font-semibold">Activity</p><p className="mt-1 text-[11px] text-muted">Picks, big wins, injury news and line moves</p></div><button onClick={() => setPage("Community")} className="text-[11px] font-semibold text-lime">Open feed <span>→</span></button></div><ActivityFeed compact onProfile={(handle) => go("Community", { community: { handle } })} onTail={tail} onMore={() => setPage("Community")} /></div>
+            <div className="rounded-2xl border border-line bg-panel p-4 sm:p-5"><div className="flex items-center gap-2"><Trophy size={16} className="text-lime" /><p className="text-sm font-semibold">Your progress</p></div><p className="mt-1 text-[11px] text-muted">{me ? `${me.rank} · ${me.xp.total.toLocaleString()} XP` : "Level, streak and badges"}</p>{me && <div className="mt-5 space-y-4"><XpBar current={me.xp.current} next={me.xp.next} level={me.level} /><div className="grid grid-cols-2 gap-2"><div className="rounded-xl border border-line bg-[#0e1416] p-3"><p className="text-[9px] uppercase tracking-wider text-muted">Daily streak</p><p className="mt-1 font-display text-lg font-bold text-white">{me.streak.days} day{me.streak.days === 1 ? "" : "s"}</p><p className="text-[10px] text-muted">Best {me.streak.best}</p></div><div className="rounded-xl border border-line bg-[#0e1416] p-3"><p className="text-[9px] uppercase tracking-wider text-muted">Profile</p><p className="mt-1 truncate font-display text-lg font-bold text-white">@{me.handle}</p><p className="text-[10px] text-muted">{me.isPublic ? "Public" : "Private"}</p></div></div><button onClick={() => go("Community", { community: { tab: "profile" } })} className="w-full rounded-lg border border-line py-2.5 text-xs font-semibold text-[#c5f467] hover:bg-white/[0.03]">View badges & profile</button></div>}</div>
+          </div>
         </section>}
         {page === "Bet tracker" && <BetTracker bets={bets} search={search} setSearch={setSearch} onAdd={() => setBetModal(true)} onChanged={refresh} />}
         {page === "Analytics" && <Analytics performance={performance} summary={summary} />}
+        {page === "Community" && <Suspense fallback={<div className="flex min-h-[240px] items-center justify-center text-lime"><Activity className="animate-pulse" /></div>}><CommunityPage myHandle={me?.handle ?? null} onTail={tail} /></Suspense>}
         {page === "Odds screen" && <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-line bg-panel text-sm text-muted">Loading odds screen…</div>}><OddsPage onLog={(draft) => { setBetDraft(draft); setBetModal(true); }} /></Suspense>}
         {page === "Stats" && <Suspense fallback={<div className="flex min-h-[240px] items-center justify-center text-lime"><Activity className="animate-pulse" /></div>}><StatsPage /></Suspense>}
         {page === "Injury report" && <Suspense fallback={<div className="flex min-h-[240px] items-center justify-center text-lime"><Activity className="animate-pulse" /></div>}><InjuryReportPage /></Suspense>}
@@ -182,6 +223,11 @@ function App() {
         <footer className="mt-10 flex flex-wrap items-center justify-between gap-2 border-t border-line py-5 text-[10px] text-[#69757a]"><span>© 2025 SharpStats Pro · For research and informational purposes only.</span><span className="flex items-center gap-3"><button className="hover:text-white"><CircleHelp size={13} className="inline" /> Help center</button><button onClick={() => setPage("Settings")} className="hover:text-white">Preferences</button></span></footer>
       </div>
     </main>
+    <nav aria-label="Quick navigation" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-[#0e1316]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
+      {([["Overview", LayoutDashboard, "Home"], ["Odds screen", Compass, "Odds"], ["Stats", Trophy, "Stats"], ["Community", Users, "Community"], ["Bet tracker", FileSpreadsheet, "Bets"]] as const).map(([name, Icon, label]) => (
+        <button key={name} type="button" onClick={() => { setPage(name); window.scrollTo({ top: 0 }); }} aria-current={page === name ? "page" : undefined} className={`flex min-h-[56px] flex-col items-center justify-center gap-1 text-[10px] ${page === name ? "text-lime" : "text-muted"}`}><Icon size={19} strokeWidth={1.8} />{label}</button>
+      ))}
+    </nav>
     {betModal && <BetModal key={JSON.stringify(betDraft ?? {})} initialBet={betDraft} onClose={() => { setBetModal(false); setBetDraft(undefined); }} onSaved={() => void refresh()} />}
   </div>;
 }
@@ -193,8 +239,8 @@ function Insight({ icon, title, body, warning = false }: { icon: ReactNode; titl
   return <div className={`flex gap-3 rounded-xl border p-3 ${warning ? "border-amber-900/50 bg-amber-950/20" : "border-line bg-[#0e1416]"}`}><div className={`mt-0.5 ${warning ? "text-amber-400" : "text-lime"}`}>{icon}</div><div><p className="text-xs font-semibold">{title}</p><p className="mt-1 text-[10px] leading-relaxed text-muted">{body}</p></div></div>;
 }
 
-function BetTable({ bets, onResult }: { bets: Bet[]; onResult?: (bet: Bet, result: Bet["result"]) => void }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left"><thead><tr className="text-[9px] font-semibold tracking-wider text-[#738087]"><th className="px-5 py-3">MATCHUP</th><th className="px-3 py-3">ODDS</th><th className="px-3 py-3">STAKE</th><th className="px-3 py-3">RESULT</th><th className="px-5 py-3 text-right">P/L</th></tr></thead><tbody>{bets.length ? bets.map((bet) => <tr key={bet.id} className="border-t border-line/80 text-xs"><td className="px-5 py-3.5"><p className="font-medium text-white">{bet.event}</p><p className="mt-1 text-[10px] text-muted">{bet.sport} · {bet.sportsbook}</p></td><td className="px-3 py-3.5 text-[#d9e0dc]">{Number(bet.odds).toFixed(2)}</td><td className="px-3 py-3.5 text-[#d9e0dc]">{currency(bet.stake)}</td><td className="px-3 py-3.5">{onResult && bet.result === "pending" ? <select aria-label={`Set result for ${bet.event}`} value={bet.result} onChange={(e) => onResult(bet, e.target.value as Bet["result"])} className="rounded-md border border-line bg-[#0c1114] px-2 py-1 text-[10px] text-amber-300"><option value="pending">Pending</option><option value="win">Win</option><option value="loss">Loss</option><option value="push">Push</option></select> : <ResultBadge result={bet.result} />}</td><td className={`px-5 py-3.5 text-right font-semibold ${Number(bet.profit_loss) >= 0 ? "text-lime" : "text-rose-400"}`}>{Number(bet.profit_loss) > 0 ? "+" : ""}{currency(bet.profit_loss)}</td></tr>) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-muted">No bets yet. Add your first bet to get started.</td></tr>}</tbody></table></div>;
+function BetTable({ bets, onResult, shared, onShare }: { bets: Bet[]; onResult?: (bet: Bet, result: Bet["result"]) => void; shared?: Record<string, number>; onShare?: (bet: Bet) => void }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left"><thead><tr className="text-[9px] font-semibold tracking-wider text-[#738087]"><th className="px-5 py-3">MATCHUP</th><th className="px-3 py-3">ODDS</th><th className="px-3 py-3">STAKE</th><th className="px-3 py-3">RESULT</th><th className="px-5 py-3 text-right">P/L</th></tr></thead><tbody>{bets.length ? bets.map((bet) => <tr key={bet.id} className="border-t border-line/80 text-xs"><td className="px-5 py-3.5"><p className="font-medium text-white">{bet.event}</p><p className="mt-1 text-[10px] text-muted">{bet.sport} · {bet.sportsbook}{shared?.[bet.id] ? <span className="ml-1.5 rounded bg-lime/10 px-1 py-0.5 text-[9px] font-semibold text-lime">SHARED</span> : onShare && bet.result === "pending" ? <button type="button" onClick={() => onShare(bet)} className="ml-1.5 inline-flex items-center gap-0.5 rounded border border-line px-1.5 py-0.5 text-[9px] font-semibold text-[#c5f467] hover:bg-white/[0.04]"><Share2 size={9} />Share pick</button> : null}</p></td><td className="px-3 py-3.5 text-[#d9e0dc]">{Number(bet.odds).toFixed(2)}</td><td className="px-3 py-3.5 text-[#d9e0dc]">{currency(bet.stake)}</td><td className="px-3 py-3.5">{onResult && bet.result === "pending" ? <select aria-label={`Set result for ${bet.event}`} value={bet.result} onChange={(e) => onResult(bet, e.target.value as Bet["result"])} className="rounded-md border border-line bg-[#0c1114] px-2 py-1 text-[10px] text-amber-300"><option value="pending">Pending</option><option value="win">Win</option><option value="loss">Loss</option><option value="push">Push</option></select> : <ResultBadge result={bet.result} />}</td><td className={`px-5 py-3.5 text-right font-semibold ${Number(bet.profit_loss) >= 0 ? "text-lime" : "text-rose-400"}`}>{Number(bet.profit_loss) > 0 ? "+" : ""}{currency(bet.profit_loss)}</td></tr>) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-muted">No bets yet. Add your first bet to get started.</td></tr>}</tbody></table></div>;
 }
 function ResultBadge({ result }: { result: string }) {
   const color = result === "win" ? "bg-lime/10 text-lime" : result === "loss" ? "bg-rose-400/10 text-rose-400" : result === "push" ? "bg-slate-400/10 text-slate-300" : "bg-amber-400/10 text-amber-300";
@@ -203,6 +249,8 @@ function ResultBadge({ result }: { result: string }) {
 
 function BetTracker({ bets, search, setSearch, onAdd, onChanged }: { bets: Bet[]; search: string; setSearch: (value: string) => void; onAdd: () => void; onChanged: () => void }) {
   const [filter, setFilter] = useState("all");
+  const [sharing, setSharing] = useState<Bet | null>(null);
+  const sharedQuery = useQuery({ queryKey: ["shared-bets"], queryFn: api.sharedBets });
   const [message, setMessage] = useState("");
   const visible = bets.filter((bet) => filter === "all" || bet.result === filter);
   async function exportCsv() {
@@ -234,10 +282,10 @@ function BetTracker({ bets, search, setSearch, onAdd, onChanged }: { bets: Bet[]
       onChanged();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Import failed"); }
   }
-  return <section><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-bold tracking-[0.17em] text-lime">WORKSPACE</p><h2 className="font-display text-2xl font-extrabold">Bet tracker</h2><p className="mt-1.5 text-sm text-muted">Every wager, one clear view.</p></div><div className="flex flex-wrap gap-2"><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white"><ArrowDownToLine size={15} />Import CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => void importCsv(e.target.files?.[0])} /></label><button onClick={() => void exportCsv()} className="flex items-center gap-2 rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white"><ArrowUpRight size={15} />CSV</button><button onClick={() => void exportReport("xlsx")} className="rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white">Excel</button><button onClick={() => void exportReport("pdf")} className="rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white">PDF</button><button onClick={onAdd} className="flex items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-xs font-bold text-[#11170c]"><Plus size={15} />Log bet</button></div></div>
+  return <section>{sharing && <SharePickModal bet={sharing} onClose={() => setSharing(null)} onShared={() => { void sharedQuery.refetch(); setMessage("Pick shared to the community."); }} />}<div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-bold tracking-[0.17em] text-lime">WORKSPACE</p><h2 className="font-display text-2xl font-extrabold">Bet tracker</h2><p className="mt-1.5 text-sm text-muted">Every wager, one clear view.</p></div><div className="flex flex-wrap gap-2"><label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white"><ArrowDownToLine size={15} />Import CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => void importCsv(e.target.files?.[0])} /></label><button onClick={() => void exportCsv()} className="flex items-center gap-2 rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white"><ArrowUpRight size={15} />CSV</button><button onClick={() => void exportReport("xlsx")} className="rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white">Excel</button><button onClick={() => void exportReport("pdf")} className="rounded-xl border border-line px-3 py-2.5 text-xs text-muted hover:text-white">PDF</button><button onClick={onAdd} className="flex items-center gap-2 rounded-xl bg-lime px-4 py-2.5 text-xs font-bold text-[#11170c]"><Plus size={15} />Log bet</button></div></div>
     {message && <div className="mb-4 flex justify-between rounded-lg border border-line bg-panel px-4 py-3 text-xs text-muted">{message}<button onClick={() => setMessage("")} aria-label="Dismiss"><X size={14} /></button></div>}
     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel p-3"><div className="relative min-w-[200px] flex-1"><Search className="absolute left-3 top-2.5 text-muted" size={15} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search event, sport, sportsbook..." className="w-full rounded-lg border border-line bg-[#0c1114] py-2 pl-9 pr-3 text-xs outline-none focus:border-lime" /></div>{["all", "pending", "win", "loss", "push"].map((item) => <button key={item} onClick={() => setFilter(item)} className={`rounded-lg px-3 py-2 text-[10px] capitalize ${filter === item ? "bg-[#27312a] text-lime" : "text-muted hover:text-white"}`}>{item === "all" ? "All bets" : item}</button>)}</div>
-    <div className="overflow-hidden rounded-2xl border border-line bg-panel"><div className="flex items-center justify-between border-b border-line px-5 py-4"><div><p className="text-sm font-semibold">All bets <span className="ml-1 rounded bg-[#20292e] px-1.5 py-0.5 text-[10px] text-muted">{visible.length}</span></p><p className="mt-1 text-[11px] text-muted">Manage and settle your wagers</p></div></div><BetTable bets={visible} onResult={async (bet, result) => { await api.updateBet(bet.id, { result }); onChanged(); }} /></div>
+    <div className="overflow-hidden rounded-2xl border border-line bg-panel"><div className="flex items-center justify-between border-b border-line px-5 py-4"><div><p className="text-sm font-semibold">All bets <span className="ml-1 rounded bg-[#20292e] px-1.5 py-0.5 text-[10px] text-muted">{visible.length}</span></p><p className="mt-1 text-[11px] text-muted">Manage and settle your wagers</p></div></div><BetTable bets={visible} shared={sharedQuery.data?.shared} onShare={setSharing} onResult={async (bet, result) => { await api.updateBet(bet.id, { result }); onChanged(); }} /></div>
   </section>;
 }
 function parseCsvLine(line: string): string[] {
@@ -328,7 +376,7 @@ function SettingsPage({ user, onUpdated }: { user: User; onUpdated: (user: User)
     try { const result = await api.favorite(book.id, !book.favorite); setBooks(books.map((item) => item.id === book.id ? { ...item, favorite: result.favorite } : item)); }
     catch (error) { setMessage(error instanceof Error ? error.message : "Could not update favorite"); }
   }
-  return <section><PageHeading eyebrow="PREFERENCES" title="Settings" subtitle="Manage your profile and favorite sportsbooks." /><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-2xl border border-line bg-panel p-5"><h3 className="text-sm font-semibold">Profile</h3><p className="mt-1 text-xs text-muted">Account details and display name.</p><label className="mt-5 block text-xs text-muted">Username<input value={name} onChange={(e) => setName(e.target.value)} className="mt-2 w-full rounded-lg border border-line bg-[#0c1114] px-3 py-2.5 text-sm text-white outline-none focus:border-lime" /></label><p className="mt-3 text-xs text-muted">Email <span className="ml-2 text-white">{user.email}</span></p><button onClick={() => void saveName()} className="mt-5 rounded-lg bg-lime px-4 py-2 text-xs font-bold text-[#11170c]">Save profile</button>{message && <p className="mt-3 text-xs text-muted">{message}</p>}</div><div className="rounded-2xl border border-line bg-panel p-5"><h3 className="text-sm font-semibold">Favorite sportsbooks</h3><p className="mt-1 text-xs text-muted">Choose books to prioritize in your research.</p><div className="mt-4 space-y-2">{books.map((book) => <button key={book.id} onClick={() => void toggle(book)} className="flex w-full items-center justify-between rounded-lg border border-line bg-[#0c1114] px-3 py-2.5 text-xs"><span>{book.name}</span><Bookmark size={15} className={book.favorite ? "fill-lime text-lime" : "text-muted"} /></button>)}</div></div></div></section>;
+  return <section><PageHeading eyebrow="PREFERENCES" title="Settings" subtitle="Manage your profile and favorite sportsbooks." /><div className="grid gap-4 lg:grid-cols-2"><div className="rounded-2xl border border-line bg-panel p-5"><h3 className="text-sm font-semibold">Profile</h3><p className="mt-1 text-xs text-muted">Account details and display name.</p><label className="mt-5 block text-xs text-muted">Username<input value={name} onChange={(e) => setName(e.target.value)} className="mt-2 w-full rounded-lg border border-line bg-[#0c1114] px-3 py-2.5 text-sm text-white outline-none focus:border-lime" /></label><p className="mt-3 text-xs text-muted">Email <span className="ml-2 text-white">{user.email}</span></p><button onClick={() => void saveName()} className="mt-5 rounded-lg bg-lime px-4 py-2 text-xs font-bold text-[#11170c]">Save profile</button>{message && <p className="mt-3 text-xs text-muted">{message}</p>}</div><div className="rounded-2xl border border-line bg-panel p-5"><h3 className="text-sm font-semibold">Favorite sportsbooks</h3><p className="mt-1 text-xs text-muted">Choose books to prioritize in your research.</p><div className="mt-4 space-y-2">{books.map((book) => <button key={book.id} onClick={() => void toggle(book)} className="flex w-full items-center justify-between rounded-lg border border-line bg-[#0c1114] px-3 py-2.5 text-xs"><span>{book.name}</span><Bookmark size={15} className={book.favorite ? "fill-lime text-lime" : "text-muted"} /></button>)}</div></div></div><SocialSettings /></section>;
 }
 
 export default App;

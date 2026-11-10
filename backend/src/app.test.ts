@@ -31,6 +31,13 @@ describe("HTTP API", () => {
     },
   );
 
+  it.each(["/api/social/me", "/api/social/feed", "/api/social/picks", "/api/social/leaderboards", "/api/social/profiles/demo", "/api/notifications", "/api/realtime/stream", "/api/live-games/401/chat?league=nba"])(
+    "requires authentication for %s",
+    async (path) => {
+      await request(app).get(path).expect(401);
+    },
+  );
+
   it.each(["http://localhost:5175", "http://localhost:5177", "http://192.168.1.180:5175", "http://192.168.1.180:5177", "http://192.168.1.179:5175"])(
     "allows the frontend origin %s",
     async (origin) => {
