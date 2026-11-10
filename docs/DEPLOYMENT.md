@@ -11,7 +11,7 @@ For production, set `NODE_ENV=production`, terminate TLS at a trusted reverse pr
 
 ## Railway
 
-Railway assigns the port through `PORT`, and the API listens on it (4000 when unset), so don't set `PORT` yourself. Set the service health-check path to `/health`, which returns `{ "status": "ok" }`. The API starts listening only after the schema and migrations are applied, so allow a startup timeout of at least a minute. Also set `DATABASE_URL`, `JWT_SECRET` and `CLIENT_ORIGIN` (your frontend's public URL).
+Railway assigns the port through `PORT`, and the API listens on it (4000 when unset), so don't set `PORT` yourself. Set the service health-check path to `/health`, which returns `{ "status": "ok", "service": "sharpstats-backend" }`. Railway sits in front of the API as one proxy hop, so the default `TRUST_PROXY=1` is correct; it makes rate limits apply per visitor and avoids express-rate-limit's `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` error. If another proxy is added in front (for example a Vercel rewrite that forwards `/api` to Railway), set `TRUST_PROXY=2`. Render and a single Nginx reverse proxy also use `1`. The API starts listening only after the schema and migrations are applied, so allow a startup timeout of at least a minute. Also set `DATABASE_URL`, `JWT_SECRET` and `CLIENT_ORIGIN` (your frontend's public URL).
 
 ## CI/CD
 
