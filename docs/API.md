@@ -62,6 +62,37 @@ All stats routes require authentication. `:league` is `nba`, `nfl`, `mlb` or `nh
 
 Data comes from ESPN's public stats feeds, plus MLB Stats API relief splits for bullpen ERA. Responses are cached in memory and in the `stats_cache` table for `STATS_REFRESH_MINUTES` (default 15). A background job re-fetches every league on that interval. If a provider fails, the last saved copy is served with `stale: true`. Manual refreshes (`POST .../refresh`, or `refresh=true` on profile routes) are limited to six per minute. `last10`/`last30` form views recalculate stats from game logs for the highest-volume players in each position group. Team tables always use full-season data. NFL EPA and DVOA are not published by these providers and are listed in `unavailableMetrics`. Provider failures with no saved copy return 502.
 
+## Live game tracker
+
+All routes require authentication. `league` is `nba` (default), `nfl`, `mlb` or `nhl`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/live-games?league=nba` | Today's games (the current week for the NFL) with status, clock, period, possession, situation, team timeouts/fouls/shots, win probability and live moneyline/spread/total. `counts`, `fetchedAt`, `oddsUpdatedAt`, `refreshSeconds` (15). `refresh=true` skips the cache (12 per minute). |
+| GET | `/live-games/:id?league=nba` | One game: everything above plus team stats, box score by stat group, leaders, recent plays, win probability series and `odds` (per-book current, opening and closing prices, movement from open, period markets if loaded, coverage of the eight tracked books, ESPN DraftKings open/latest). |
+| GET | `/live-games/player/:id?league=nba&gameId=…` | Live player performance: current stats, game progress and per-prop current value, season average, pace, projected finish, line (sportsbook prop or `stat`+`line` override), hit probability, over progress and under cushion. |
+
+Sources: ESPN scoreboard and summary feeds (scores, situations, box scores, ESPN win probability, DraftKings lines) and the NHL official API (power-play strength). Responses are cached for 10 seconds. Win probability falls back to the no-vig moneyline where ESPN doesn't publish one (NHL). Sportsbook prices come from the odds board and follow its credit-paced refresh schedule; viewing a game never buys extra refreshes. "Closing" is each book's last recorded price before the start time. Snapshots are stored in `games`, `live_scores`, `player_game_stats` and `live_odds_snapshots`.
+
+Projection: projected finish = current + expected remaining production. The rate blends the season average with tonight's pace, weighted by game progress (NBA uses minutes played and season minutes per game). Hit probability treats the remaining production as Poisson (counting stats) or normal with stat-specific dispersion (points, yards).
+
+## Injury report
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/injuries?league=nba` | Injury rows with impact, status counts, team health and filter options. Filters: `team`, `position`, `status` (comma-separated), `updated` (`24h`, `3d`, `7d`, `all`), `q`. "Active" (returning) rows are hidden unless `status` includes `Active`. `refresh=true` re-fetches (6 per minute). |
+| GET | `/injuries/player/:id?league=nba` | Full details, first-reported date, recorded status timeline, past injuries, recent news (Rotowire via ESPN), practice participation and workload notes from the reports, and spread impact. |
+| GET | `/injuries/team/:id?league=nba` | Team health (score, label, counts, key absences), its injuries, spread impact for the top absence and the recorded health trend. |
+| GET | `/injuries/impact?league=nba&min=30&limit=25` | Key injuries (importance ≥ `min`, status weight ≥ 0.3) with spread movement on each team's next game. |
+
+Statuses: Out, Doubtful, Questionable, Game Time Decision (from report notes), Probable, Day-to-Day, Injured Reserve, Suspended, Inactive and Active (listed but cleared, shown as Returning).
+
+Impact model: season statistics are converted into team strength lost per game against a replacement-level player (NBA game score, NFL passing or scrimmage production by position, MLB OPS or ERA × innings, NHL points or save %). Importance (0–100) scales that loss to an elite absence for the league. Status weight sets how much applies to the next game (Out 100%, Doubtful 75%, Game Time Decision 50%, Questionable 40%, Day-to-Day 30%, Probable 10%). Win impact uses about 2.8% per point (NBA), 3% per point (NFL), 10% per run (MLB) and 20% per goal (NHL). Team health = 100 × Π(1 − 0.5 × importance × weight). These are rules of thumb, not a trained model; each row's `basis` explains its inputs.
+
+Odds impact: each book's last spread at or before the report time vs. its current spread on the team's next game. When the report predates line tracking, the first tracked line is used and `baseline` is `tracking_start`. Movement after a report is a correlation, not proof the injury caused it.
+
+Alerts (Odds screen alert feed, types `injury_out`, `injury_upgrade`, `injury_downgrade`, `injury_return`, `injury_line`): raised for players with importance ≥ 30 when the status changes between syncs, and when a key player's team spread moves a point or more against them after the report. The first sync after the tables are created only records a baseline. Reports are stored in `injuries`, `injury_history`, `injury_impact` and `team_health`.
+
 ## Error format
 
 Errors use `{ "error": "..." }`. Validation errors may include a `details` field. Common statuses are 400 (invalid input), 401 (authentication), 404 (not found), 409 (duplicate email), and 429 (rate limit).

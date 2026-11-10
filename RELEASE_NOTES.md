@@ -1,5 +1,40 @@
 # Release notes
 
+## SharpStats Pro 1.5.0
+
+**Version:** 1.5.0
+**Release date:** 2026-11-09
+
+### Features added
+- **Live Game Tracker** (Stats → Live games):
+  - NBA, NFL, MLB and NHL games updating every 15 seconds: score, clock, period or inning, possession, game status, win probability and live moneyline, spread and total.
+  - Sport-specific detail: NBA timeouts and fouls; NFL down, distance and red zone; MLB count, outs, base runners and pitcher/batter; NHL shots and power plays.
+  - Game view with box score, team stats, leaders, win probability chart, recent plays and a sportsbook comparison (opening, current and closing odds).
+- **Live player tracker:** pick any player to see current stats, projected finish and the chance of clearing a prop line.
+- **Injury Report** (Research → Injury report):
+  - Every listed injury in the four leagues, with filters by team, position, status, update date and search.
+  - Betting impact ratings for each injury, team health scores and a player page with history, news, practice participation and workload notes.
+- **Odds impact:** see how a team's spread has moved since a key player's report. Injury alerts (ruled out, upgrades, downgrades, returns, line movement) appear in the Odds screen alert feed, and the Odds screen has a new "Injury impact" tab.
+
+### Bug fixes
+- None.
+
+### Performance improvements
+- Live and injury data are cached server-side (10 seconds and 5 minutes), so many open screens share one provider call.
+- The live tracker never triggers extra paid odds refreshes. After a restart it shows ESPN's DraftKings line until the next scheduled refresh.
+
+### Breaking changes
+- None. The new database tables are created automatically by migration `002` on startup.
+
+### Known issues
+- **Impact ratings are estimates:** they're rules of thumb based on season statistics, not a trained model.
+- **Spread movement after a report is correlation, not proof** the injury caused it. Reports older than line tracking are compared with the first tracked line instead.
+- **Injury history starts with this release:** it shows the status changes SharpStats records from now on, plus ESPN's latest notes.
+- **Practice participation and workload limits** are taken from report notes, so they only appear when the notes mention them (mostly NFL).
+- **NHL win probability:** ESPN doesn't publish one for the NHL, so it uses the no-vig moneyline.
+- **Possession and live lines:** ESPN doesn't publish NBA possession. Once a game starts, ESPN's line is DraftKings' closing line; in-game prices come from the multi-book board on its credit-paced schedule.
+- **Quarter/period markets and player prop lines** load on request, because each load uses The Odds API credits. Caesars and Fanatics still have no prices from the provider.
+
 ## SharpStats Pro 1.4.1
 
 **Version:** 1.4.1

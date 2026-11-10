@@ -24,6 +24,13 @@ describe("HTTP API", () => {
     },
   );
 
+  it.each(["/api/live-games?league=nba", "/api/live-games/401?league=nba", "/api/live-games/player/1?league=nba&gameId=401", "/api/injuries?league=nfl", "/api/injuries/player/1?league=nba", "/api/injuries/team/1?league=nba", "/api/injuries/impact?league=nba"])(
+    "requires authentication for %s",
+    async (path) => {
+      await request(app).get(path).expect(401);
+    },
+  );
+
   it.each(["http://localhost:5175", "http://localhost:5177", "http://192.168.1.180:5175", "http://192.168.1.180:5177", "http://192.168.1.179:5175"])(
     "allows the frontend origin %s",
     async (origin) => {

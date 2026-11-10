@@ -14,8 +14,9 @@ import { PlayerProfileView } from "../components/stats/PlayerProfileView";
 import { TeamProfileView } from "../components/stats/TeamProfileView";
 import { ComparePanel, MAX_COMPARE } from "../components/stats/ComparePanel";
 import { Avatar, LoadingBlock, Segmented } from "../components/stats/StatsUi";
+import { LiveGamesPage } from "./LiveGamesPage";
 
-type Tab = "leaders" | "players" | "teams" | "compare";
+type Tab = "leaders" | "players" | "teams" | "compare" | "live";
 type View = { kind: "hub" } | { kind: "player"; id: string } | { kind: "team"; id: string };
 const LEAGUE_KEY = "sharpstats_stats_league";
 const REFRESH_MS = 15 * 60 * 1000;
@@ -174,7 +175,7 @@ export function StatsPage() {
         <h2 className="font-display text-2xl font-extrabold">Stats</h2>
         <p className="mt-1.5 text-sm text-muted">Current-season player and team statistics for betting research.</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      {!(view.kind === "hub" && tab === "live") && <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2.5 text-[11px] text-muted">
           <Clock3 size={13} className="text-lime" />Last Updated: <span className="text-white">{formatUpdated(data?.fetchedAt)}</span>
         </span>
@@ -186,7 +187,7 @@ export function StatsPage() {
             <Download size={14} />Export CSV
           </button>
         )}
-      </div>
+      </div>}
     </div>
   );
 
@@ -203,7 +204,7 @@ export function StatsPage() {
           onTeam={(id) => open({ kind: "team", id })}
         />
       </div>
-      {view.kind === "hub" && <div className="border-t border-line pt-3"><StatsFilters data={data} value={filters} onChange={setFilters} showPosition={tab !== "teams"} /></div>}
+      {view.kind === "hub" && tab !== "live" && <div className="border-t border-line pt-3"><StatsFilters data={data} value={filters} onChange={setFilters} showPosition={tab !== "teams"} /></div>}
     </div>
   );
 
@@ -259,7 +260,7 @@ export function StatsPage() {
   return (
     <section>
       {header}{toolbar}{notices}
-      {favorites.length > 0 && (
+      {favorites.length > 0 && tab !== "live" && (
         <div className="scrollbar-hide mb-4 flex items-center gap-2 overflow-x-auto pb-1">
           <span className="shrink-0 text-[10px] font-bold tracking-[0.14em] text-muted">FAVORITES</span>
           {favorites.map((favorite) => (
@@ -286,17 +287,18 @@ export function StatsPage() {
             { value: "players", label: "Players" },
             { value: "teams", label: "Teams" },
             { value: "compare", label: compareCount ? `Compare (${compareCount})` : "Compare" },
+            { value: "live", label: "Live games" },
           ]}
         />
-        {data && (
+        {data && tab !== "live" && (
           <p className="text-[11px] text-muted">
             {data.name} {data.season.displayName} · {WINDOW_LABELS[filters.window]} · auto-refresh every {data.refreshMinutes} min
           </p>
         )}
       </div>
-      {data?.windowNote && tab !== "teams" && <p className="mb-4 rounded-xl border border-line bg-[#0e1416] px-4 py-3 text-[11px] leading-relaxed text-muted">{data.windowNote}</p>}
+      {data?.windowNote && tab !== "teams" && tab !== "live" && <p className="mb-4 rounded-xl border border-line bg-[#0e1416] px-4 py-3 text-[11px] leading-relaxed text-muted">{data.windowNote}</p>}
 
-      {!data ? <LoadingBlock label={filters.window === "season" ? "Loading statistics…" : "Building form view from recent game logs…"} /> : (
+      {tab === "live" ? <LiveGamesPage league={league} /> : !data ? <LoadingBlock label={filters.window === "season" ? "Loading statistics…" : "Building form view from recent game logs…"} /> : (
         <>
           {tab === "leaders" && <LeagueLeaders boards={data.leaders} groupLabels={groupLabels} filter={leaderMatches} onPlayer={(id) => open({ kind: "player", id })} showSample={filters.window !== "season"} />}
           {tab === "players" && group && (

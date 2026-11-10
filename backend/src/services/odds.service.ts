@@ -594,6 +594,27 @@ export async function getGame(sport: OddsSport, gameId: string, options: { props
   };
 }
 
+/**
+ * The board's games and priced selections for a league, for the live tracker and injury reports.
+ * Viewing counts as demand, so refreshes follow the normal credit-paced schedule; nothing extra is bought.
+ */
+export async function oddsSnapshot(sport: OddsSport): Promise<{ games: OddsGame[]; selections: Selection[]; fetchedAt: string | null; source: OddsSource | null }> {
+  const st = state(sport);
+  markDemand(sport);
+  // After a restart the board is empty but the last refresh time is restored. Wait for the paced
+  // slot instead of buying a refresh; callers fall back to ESPN's DraftKings lines meanwhile.
+  const interval = autoIntervalMs(sport);
+  if (st.featured || providerMode() !== "the-odds-api" || (interval > 0 && Date.now() - st.lastAttemptAt >= interval)) {
+    await ensureFeatured(sport).catch(() => undefined);
+  }
+  return {
+    games: [...st.games.values()],
+    selections: compute(sport).selections,
+    fetchedAt: st.featured ? new Date(st.featured.fetchedAt).toISOString() : null,
+    source: st.source,
+  };
+}
+
 /* ---------- Scanners ---------- */
 
 export async function getEv(sport: OddsSport, options: { minEv: number; category?: MarketCategory | "all"; book?: string; market?: string }) {

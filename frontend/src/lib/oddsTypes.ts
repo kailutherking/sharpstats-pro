@@ -246,7 +246,8 @@ export interface PropsData {
   requiresApiKey: boolean;
 }
 
-export type AlertType = "line_move" | "steam" | "sharp" | "reverse_move" | "positive_ev" | "arbitrage" | "best_price" | "clv";
+export type AlertType = "line_move" | "steam" | "sharp" | "reverse_move" | "positive_ev" | "arbitrage" | "best_price" | "clv"
+  | "injury_out" | "injury_upgrade" | "injury_downgrade" | "injury_return" | "injury_line";
 
 export interface OddsAlert {
   id: number; type: AlertType; sport: OddsSport; gameId: string; game: string; market: string; sideId: string | null; book: string | null;

@@ -14,6 +14,11 @@ export const ALERT_LABELS: Record<AlertType, string> = {
   arbitrage: "Arbitrage",
   best_price: "Best available price",
   clv: "CLV opportunity",
+  injury_out: "Player ruled out",
+  injury_upgrade: "Injury upgrade",
+  injury_downgrade: "Injury downgrade",
+  injury_return: "Return announcement",
+  injury_line: "Injury line movement",
 };
 
 const SEVERITY = { info: "border-line", notice: "border-[#34412a]", high: "border-lime/60" } as const;

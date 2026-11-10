@@ -2,6 +2,28 @@
 
 One entry per completed task, newest first. Commit hashes refer to the feature branch commit; see `git log` for merges.
 
+## 2026-11-09 — Live game tracker and injury intelligence center (1.5.0)
+
+- **Feature:** Live Game Tracker (Stats → Live games), live player prop tracker, Injury Report page, injury impact model, team health, injury alerts and odds impact
+- **Description:**
+  - **Data sources:** ESPN scoreboard and summary feeds (scores, situations, box scores, win probability, DraftKings open/close) and the NHL official API (power plays).
+  - **Live tracker:** 15-second refresh, linked to the multi-book odds board. Opening and current prices come from the board; closing prices come from `odds_history`.
+  - **Player tracker:** projected finish (season rate blended with in-game pace, minute-based for the NBA) and hit probability (Poisson or normal model).
+  - **Injury report:** ESPN injury feeds for four leagues with a rules-based impact model (team rating change against a replacement-level player, scaled by status), team health scores, and practice and workload notes taken from report text.
+  - **Odds impact:** spread at the report time vs. now, falling back to the first tracked line for older reports.
+  - **Alerts:** status-change and line-correlation alerts raised from a 5-minute background sync.
+  - **Credits:** the live tracker reuses ESPN lines after a restart, so it never buys extra The Odds API refreshes.
+  - **Verified live (Nov 9):**
+    - NBA games in progress: clock, timeouts, fouls, ESPN win probability, box score and player projections.
+    - Earlier finished NFL games: box score, leaders, plays and DraftKings open/close.
+    - Injury reports for all four leagues.
+- **Files changed:**
+  - **New backend:** `providers/espnLive.ts`, `providers/espnInjuries.ts`, `services/liveGame.service.ts`, `services/injury.service.ts`, `services/injuryImpact.service.ts`, `controllers/liveGame.controller.ts`, `controllers/injury.controller.ts`, `routes/liveGame.routes.ts`, `routes/injury.routes.ts`, `db/migrations/002_live_games_injuries.sql`, plus tests.
+  - **New frontend:** `pages/LiveGamesPage.tsx`, `pages/InjuryReportPage.tsx`, `components/live/*`, `components/injuries/*`, `lib/liveTypes.ts`, `lib/injuryTypes.ts`, plus a test.
+  - **Modified:** `app.ts`, `server.ts`, `odds.service.ts`, `oddsAlerts.service.ts`, the Prisma schema, `App.tsx`, `StatsPage.tsx`, `OddsPage.tsx`, `AlertsPanel.tsx`, `api.ts`, `oddsTypes.ts`, docs, `.env.example`, `docker-compose.yml`, versions.
+- **Commit hash:** c835606
+- **Version:** 1.5.0
+
 ## 2026-11-08 — Railway port and /health endpoint (1.4.1)
 
 - **Feature:** Host-assigned port and a platform health check
