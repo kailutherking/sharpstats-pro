@@ -8,6 +8,10 @@ The Stats research center (Research → Stats) covers current-season NBA, NFL, M
 
 The Odds Screen (Research → Odds screen) is a real-time sportsbook market board for NBA, NFL, MLB and NHL: line shopping across DraftKings, FanDuel, BetMGM, Caesars, ESPN BET, Fanatics, BetRivers, PrizePicks and Underdog; opening/current/peak prices and best/worst price with history charts; steam, sharp and (estimated) reverse line movement plus biggest movers; no-vig fair odds, +EV scanner with edge and a 0–100 confidence rating, arbitrage scanner; player prop hit rates; live alerts and a CLV tracker. Set `ODDS_API_KEY` ([The Odds API](https://the-odds-api.com)) for full multi-book coverage; without it, DraftKings game lines load from ESPN's public feed.
 
+The Live Game Tracker (Research → Stats → Live games) follows today's NBA, NFL, MLB and NHL games every 15 seconds: score, clock, period or inning, possession, game status (pregame, live, halftime, end of quarter/period, final), win probability and live moneyline, spread and total. Sport-specific panels cover NBA timeouts and team fouls, NFL down and distance with a red-zone flag, MLB balls, strikes, outs, base runners and pitcher/batter, and NHL shots and power plays. Each game has team stats, leaders, a full box score, a win probability chart, a sportsbook comparison with opening, current and closing odds, and a live player tracker that projects each player's finish and the chance of clearing a prop line. Data comes from ESPN's public game feeds and the NHL's official API (no key); sportsbook prices come from the Odds screen.
+
+The Injury Report (Research → Injury report) lists every injury for the four leagues from ESPN's injury feeds, refreshed every 5 minutes, with filters by team, position, status, update date and search. Each injury gets a betting impact estimate (importance, team rating and win probability change, offensive, defensive, fantasy and prop impact, and teammates likely to gain usage), team health scores, a player page with history, news, practice participation and workload notes, and the spread movement on the team's next game since the report. Status changes raise alerts (ruled out, upgraded, downgraded, returning, line movement) in the Odds screen's alert feed.
+
 > SharpStats Pro is an analytics tool, not financial advice or a guarantee of results. Validate all odds and wager information with your sportsbook. Bet responsibly.
 
 ## Requirements
@@ -79,7 +83,10 @@ Copy `.env.example` to `.env`. Secrets stay in `.env`, which git ignores; never 
 | `ODDS_EXTRA_BOOKS` | empty | Extra books as `key\|Name\|kind`, comma-separated |
 | `SPORTRADAR_API_KEY` | empty | Sportradar schedule adapter example |
 | `STATS_REFRESH_MINUTES` / `STATS_AUTO_REFRESH` | `15` / `true` | Stats cache refresh |
-| `STATS_PROVIDER_TIMEOUT_MS` | `20000` | Stats provider request timeout |
+| `STATS_PROVIDER_TIMEOUT_MS` | `20000` | Stats and injury provider request timeout |
+| `LIVE_PROVIDER_TIMEOUT_MS` | `12000` | Live game provider request timeout |
+| `INJURY_REFRESH_MINUTES` | `5` | Injury report refresh interval (also the background sync that raises injury alerts) |
+| `NHL_API_URL` | `https://api-web.nhle.com` | NHL official API (power-play situations) |
 | `VITE_API_URL` | current host | Frontend API base URL (build time) |
 
 ## Development workflow
@@ -103,6 +110,8 @@ All routes are prefixed with `/api`. Except for auth and health, requests requir
 - `POST /bets/grade` (moneyline, spread, and total scores when supported provider results are available)
 - `GET|PUT /profile`
 - `GET /stats/:league` (`nba`, `nfl`, `mlb`, `nhl`), `POST /stats/:league/refresh`, `GET /stats/player/:id`, `GET /stats/team/:id`, `GET|PUT /stats/favorites`
+- Live games: `GET /live-games`, `GET /live-games/:id`, `GET /live-games/player/:id`
+- Injuries: `GET /injuries`, `GET /injuries/player/:id`, `GET /injuries/team/:id`, `GET /injuries/impact`
 
 The Market Lab normalizes The Odds API prices across books, calculates no-vig consensus probabilities, identifies positive expected value and theoretical arbitrage, and records line snapshots for movement comparisons. Line movement history accrues on explicit scans (up to six scans per minute; snapshots are retained for 30 days). Player props are optional because provider market availability and API quotas vary. Configure `ODDS_API_KEY` in `.env` for current odds, historical snapshots, and supported score-based grading. Configure `SPORTRADAR_API_KEY` for the separate Sportradar schedule adapter example. Provider requests are made server-side so keys are not exposed in the browser. Review each provider's API plan, terms, and rate limits before use.
 

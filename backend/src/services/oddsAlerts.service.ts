@@ -4,7 +4,10 @@ import type { ArbitrageOpportunity, Selection } from "./oddsAggregator.service";
 import type { MoveEvent } from "./lineMovement.service";
 import type { OddsGame } from "./oddsTypes";
 
-export const ALERT_TYPES = ["line_move", "steam", "sharp", "reverse_move", "positive_ev", "arbitrage", "best_price", "clv"] as const;
+export const ALERT_TYPES = [
+  "line_move", "steam", "sharp", "reverse_move", "positive_ev", "arbitrage", "best_price", "clv",
+  "injury_out", "injury_upgrade", "injury_downgrade", "injury_return", "injury_line",
+] as const;
 export type AlertType = typeof ALERT_TYPES[number];
 
 export interface OddsAlert {
@@ -23,7 +26,8 @@ export interface OddsAlert {
   createdAt: string;
 }
 
-type Draft = Omit<OddsAlert, "id" | "createdAt"> & { signature: string };
+export type AlertDraft = Omit<OddsAlert, "id" | "createdAt"> & { signature: string };
+type Draft = AlertDraft;
 
 /** Alert thresholds (probability points unless noted). */
 export const ALERT_THRESHOLDS = {

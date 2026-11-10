@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, ArrowDownToLine, ArrowUpRight, BarChart3, Bell, Bookmark, BrainCircuit, Calculator, CircleHelp,
-  Compass, FileSpreadsheet, Gauge, LayoutDashboard, LogOut, Menu, Moon, Plus, Search, Settings2,
+  Compass, FileSpreadsheet, Gauge, HeartPulse, LayoutDashboard, LogOut, Menu, Moon, Plus, Search, Settings2,
   ShieldAlert, Sparkles, Sun, Target, Trophy, Wallet, X, Zap,
 } from "lucide-react";
 import { api, tokenStore } from "./lib/api";
@@ -16,14 +16,16 @@ import { useAuthStore } from "./lib/authStore";
 
 const StatsPage = lazy(() => import("./pages/StatsPage").then((module) => ({ default: module.StatsPage })));
 const OddsPage = lazy(() => import("./pages/OddsPage").then((module) => ({ default: module.OddsPage })));
+const InjuryReportPage = lazy(() => import("./pages/InjuryReportPage").then((module) => ({ default: module.InjuryReportPage })));
 
-type Page = "Overview" | "Bet tracker" | "Analytics" | "Odds screen" | "Stats" | "Market lab" | "Parlay builder" | "Bankroll" | "Pick analysis" | "Settings";
+type Page = "Overview" | "Bet tracker" | "Analytics" | "Odds screen" | "Stats" | "Injury report" | "Market lab" | "Parlay builder" | "Bankroll" | "Pick analysis" | "Settings";
 const navigation: { name: Page; icon: typeof LayoutDashboard; section: string }[] = [
   { name: "Overview", icon: LayoutDashboard, section: "WORKSPACE" },
   { name: "Bet tracker", icon: FileSpreadsheet, section: "WORKSPACE" },
   { name: "Analytics", icon: BarChart3, section: "WORKSPACE" },
   { name: "Odds screen", icon: Compass, section: "RESEARCH" },
   { name: "Stats", icon: Trophy, section: "RESEARCH" },
+  { name: "Injury report", icon: HeartPulse, section: "RESEARCH" },
   { name: "Market lab", icon: BrainCircuit, section: "RESEARCH" },
   { name: "Parlay builder", icon: Zap, section: "RESEARCH" },
   { name: "Pick analysis", icon: Target, section: "RESEARCH" },
@@ -171,6 +173,7 @@ function App() {
         {page === "Analytics" && <Analytics performance={performance} summary={summary} />}
         {page === "Odds screen" && <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-line bg-panel text-sm text-muted">Loading odds screen…</div>}><OddsPage onLog={(draft) => { setBetDraft(draft); setBetModal(true); }} /></Suspense>}
         {page === "Stats" && <Suspense fallback={<div className="flex min-h-[240px] items-center justify-center text-lime"><Activity className="animate-pulse" /></div>}><StatsPage /></Suspense>}
+        {page === "Injury report" && <Suspense fallback={<div className="flex min-h-[240px] items-center justify-center text-lime"><Activity className="animate-pulse" /></div>}><InjuryReportPage /></Suspense>}
         {page === "Market lab" && <MarketLab onTrack={(draft) => { setBetDraft(draft); setBetModal(true); }} onGraded={() => void refresh()} />}
         {page === "Parlay builder" && <ParlayBuilder />}
         {page === "Pick analysis" && <PickAnalysis bankroll={Number(summary?.bankroll.current_bankroll ?? 1000)} />}

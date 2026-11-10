@@ -12,6 +12,8 @@ import type {
   AlertRule, AlertRuleInput, AlertType, ArbitrageData, BoardQuery, ClvData, EvData, GameDetail, HistoryData, MovementData, OddsAlert,
   OddsBoard, OddsFavorite, OddsSport, PropsData, SearchResult, SportsbookRow,
 } from "./oddsTypes";
+import type { LiveGameDetail, LiveGamesResponse, LivePlayer } from "./liveTypes";
+import type { InjuryImpactList, InjuryQuery, InjuryReport, PlayerInjuryProfile, TeamInjuries } from "./injuryTypes";
 
 const API_URL = (
   import.meta.env.VITE_API_URL ||
@@ -196,4 +198,12 @@ export const api = {
   setOddsFavorite: (favorite: OddsFavorite, enabled: boolean) => request<{ favorite: boolean }>("/odds/favorites", { method: "PUT", body: JSON.stringify({ ...favorite, favorite: enabled }) }),
   oddsClv: () => request<ClvData>("/odds/clv"),
   oddsStream: (sport: OddsSport, signal: AbortSignal) => stream(`/odds/stream${query({ sport })}`, signal),
+  liveGames: (league: League, refresh = false) => request<LiveGamesResponse>(`/live-games${query({ league, refresh })}`),
+  liveGame: (league: League, id: string, refresh = false) => request<LiveGameDetail>(`/live-games/${encodeURIComponent(id)}${query({ league, refresh })}`),
+  livePlayer: (league: League, gameId: string, playerId: string, stat?: string, line?: number) =>
+    request<LivePlayer>(`/live-games/player/${encodeURIComponent(playerId)}${query({ league, gameId, stat, line })}`),
+  injuries: (params: InjuryQuery) => request<InjuryReport>(`/injuries${query({ ...params, status: params.status?.join(","), updated: params.updated === "all" ? undefined : params.updated })}`),
+  injuryPlayer: (league: League, id: string) => request<PlayerInjuryProfile>(`/injuries/player/${encodeURIComponent(id)}${query({ league })}`),
+  injuryTeam: (league: League, id: string) => request<TeamInjuries>(`/injuries/team/${encodeURIComponent(id)}${query({ league })}`),
+  injuryImpact: (league: League, min?: number, limit?: number) => request<InjuryImpactList>(`/injuries/impact${query({ league, min, limit })}`),
 };
