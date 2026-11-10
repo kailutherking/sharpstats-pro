@@ -1,5 +1,26 @@
 # Release notes
 
+## SharpStats Pro 1.6.1
+
+**Version:** 1.6.1
+**Release date:** 2026-11-09
+
+### Features added
+- **`TRUST_PROXY` setting** for hosting behind Railway, Render, Vercel or Nginx.
+- **Health check** at `/health` now identifies the service: `{ "status": "ok", "service": "sharpstats-backend" }`.
+
+### Bug fixes
+- **Railway rate limits:** production requests no longer log `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`. Rate limits now count each visitor separately instead of sharing one bucket for the whole proxy, which could block sign-in for everyone.
+
+### Performance improvements
+- None.
+
+### Breaking changes
+- None. The `/health` response gained a field; `status` is unchanged.
+
+### Known issues
+- **Extra proxy hops:** if a Vercel rewrite forwards API calls to Railway, set `TRUST_PROXY=2`.
+
 ## SharpStats Pro 1.6.0
 
 **Version:** 1.6.0
