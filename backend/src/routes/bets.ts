@@ -1,3 +1,5 @@
+import { onBetSettled } from "../services/social/pick.service";
+import { evaluateUser } from "../services/social/gamification.service";
 import { Router } from "express";
 import type { PoolClient } from "pg";
 import ExcelJS from "exceljs";
@@ -58,6 +60,7 @@ router.post("/", async (req: AuthRequest, res, next) => {
   try {
     const data = betSchema.parse(req.body);
     const bet = await createBet(req.user!.id, { ...data, bet_date: data.bet_date.toISOString() });
+    void evaluateUser(req.user!.id);
     res.status(201).json({ bet });
   } catch (error) {
     next(error);
@@ -105,6 +108,7 @@ router.patch("/:id", async (req: AuthRequest, res, next) => {
     );
     await syncBankroll(client, req.user!.id);
     await client.query("COMMIT");
+    if (current.result !== merged.result) void onBetSettled(req.user!.id, id, "manual");
     res.json({ bet: result.rows[0] });
   } catch (error) {
     try {

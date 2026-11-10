@@ -2,6 +2,30 @@
 
 One entry per completed task, newest first. Commit hashes refer to the feature branch commit; see `git log` for merges.
 
+## 2026-11-09 — Community, engagement and notification systems (1.6.0)
+
+- **Feature:** Real-inspired social layer: Community page (feed, picks, leaderboards, profiles), follows, reactions and comments, verified picks, badges/XP/levels/streaks, notification center, live game chat and reactions, live bet tracker, mobile bottom navigation, onboarding checklist
+- **Description:**
+  - **Research:** compared SharpStats with Real Sports using public sources (realapp.com, App Store listing, ScreensDesign teardown); analysis and roadmap are in `docs/REAL_COMPETITIVE_ANALYSIS.md`.
+  - **Scope:** built the high-priority items. Groups, push/email, the news hub and the trade feed are on the roadmap. Cards and virtual currency won't be built.
+  - **Picks:** only pending bets can be shared, so records can't be padded. Picks snapshot odds and units and are locked/verified from start times and auto-grading.
+  - **Privacy:** profiles show only shared picks, never the private bet tracker or dollar stakes.
+  - **Follows:** team, player and sportsbook follows reuse existing favorites, which now drive injury notifications and the injury feed.
+  - **Notification engine:** 14 types with per-user switches and dedupe keys, fed by alert fan-out, bet settlement, follows, reactions, comments, badges and streaks.
+  - **Real-time:** Server-Sent Events (personal stream plus per-game topics) instead of WebSockets. It fits the existing auth and proxy setup and the existing odds streams.
+  - **Live bet tracker:** links Odds-screen bets to ESPN games and scans every 60 seconds for prop hits.
+  - **Fixes during testing:** a Postgres parameter type conflict in pick settlement; sharing settled bets is now blocked.
+  - **Verified:**
+    - With a temporary second account (deleted afterwards): follow, tail, comment, notifications, profile record, feed with ESPN headlines, leaderboards.
+    - In a live NBA game: chat, reactions and plays.
+    - On mobile at 390px: no horizontal scrolling.
+- **Files changed:**
+  - **New backend:** `services/social/*` (realtime, notification, profile, pick, feed, leaderboard, gamification, liveChat, liveBetTracker, alertFanout, maintenance, tests), `routes/social.routes.ts`, `routes/notifications.routes.ts`, `routes/realtime.routes.ts`, `db/migrations/003_social_engagement.sql`.
+  - **New frontend:** `pages/CommunityPage.tsx`, `components/social/*`, `components/live/LiveGameChat.tsx`, `lib/socialTypes.ts`, `lib/useRealtime.ts`, `lib/navStore.ts`, a test.
+  - **Modified:** `app.ts`, `server.ts`, `routes/bets.ts`, `routes/liveGame.routes.ts`, `services/grading.ts`, `services/oddsAlerts.service.ts`, `services/liveGame.service.ts`, Prisma schema, `App.tsx`, `StatsPage.tsx`, `LiveGamesPage.tsx`, `OddsPage.tsx`, `api.ts`, test icon mock, README, API docs, CHANGELOG, RELEASE_NOTES, versions.
+- **Commit hash:** 8f9ec04
+- **Version:** 1.6.0
+
 ## 2026-11-09 — Live game tracker and injury intelligence center (1.5.0)
 
 - **Feature:** Live Game Tracker (Stats → Live games), live player prop tracker, Injury Report page, injury impact model, team health, injury alerts and odds impact

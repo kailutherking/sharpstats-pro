@@ -345,7 +345,7 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
       {gameFor && <GameDrawer sport={sport} gameId={gameFor} books={books} keyless={keyless} onClose={() => setGameFor(null)} onHistory={(selection) => { setHistoryFor(selection); }} />}
 
       {toasts.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-[60] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
+        <div className="fixed bottom-20 right-4 z-[60] flex w-[min(360px,calc(100vw-2rem))] lg:bottom-4 flex-col gap-2" aria-live="polite">
           {toasts.map((alert) => (
             <div key={alert.id} className="rounded-xl border border-lime/40 bg-panel p-3 shadow-2xl">
               <div className="flex items-start justify-between gap-2">

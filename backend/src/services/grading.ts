@@ -1,3 +1,4 @@
+import { onBetSettled } from "./social/pick.service";
 import { getOddsApiScores, type ScoredEvent } from "../providers/oddsApi";
 import { pool } from "../db/pool";
 import { syncBankroll } from "./bets";
@@ -90,6 +91,7 @@ export async function gradePendingBets(userId: number) {
     }
   }
   let graded = 0;
+  const gradedIds: number[] = [];
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -105,10 +107,11 @@ export async function gradePendingBets(userId: number) {
          WHERE id=$2 AND user_id=$3 AND result='pending'`,
         [result, bet.id, userId],
       );
-      if (update.rowCount) graded += 1;
+      if (update.rowCount) { graded += 1; gradedIds.push(bet.id); }
     }
     await syncBankroll(client, userId);
     await client.query("COMMIT");
+    for (const id of gradedIds) void onBetSettled(userId, id, "grader");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

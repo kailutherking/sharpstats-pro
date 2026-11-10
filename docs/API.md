@@ -93,6 +93,18 @@ Odds impact: each book's last spread at or before the report time vs. its curren
 
 Alerts (Odds screen alert feed, types `injury_out`, `injury_upgrade`, `injury_downgrade`, `injury_return`, `injury_line`): raised for players with importance ≥ 30 when the status changes between syncs, and when a key player's team spread moves a point or more against them after the report. The first sync after the tables are created only records a baseline. Reports are stored in `injuries`, `injury_history`, `injury_impact` and `team_health`.
 
+## Community, notifications and realtime
+
+All routes require authentication. Full table, data rules and design notes: [REAL_COMPETITIVE_ANALYSIS.md §9](./REAL_COMPETITIVE_ANALYSIS.md#9-api-changes).
+
+- **Picks:** `POST /social/picks { betId, body, visibility }` shares a pending tracked bet. Odds, line and size (units = stake ÷ unit size) are snapshotted when you share. `locked` = shared before the start time on the odds board; verified = locked and graded from the final score (`auto_graded`). Settled bets can't be shared (409).
+- **Records and leaderboards** use public, settled picks only, at the shared odds. ROI = units won ÷ units risked. Rate leaderboards need 5 (7 days) or 10 (30 days / all time) settled picks; units needs 3. Rank change compares against a snapshot from about a day earlier.
+- **Feed:** `GET /social/feed?scope=all|following&filter=all|picks|wins|injuries|market|news`. Injury items for `scope=following` are limited to players and teams in your Stats favorites. Market items are steam, sharp, reverse and arbitrage alerts above info severity. Headlines come from ESPN (cached 10 minutes), for your favorite sports or all four.
+- **Notifications:** types `prop_hit`, `bet_result`, `injury`, `line_move`, `odds_change`, `positive_ev`, `arbitrage`, `follower`, `following_pick`, `reaction`, `comment`, `streak`, `achievement`, `news`. Odds types come from your alert rules; injury notifications come from your rules and your followed players/teams. Each notification is deduplicated per user. Read notifications older than 60 days are pruned.
+- **Realtime:** `GET /realtime/stream` (personal: `notification`, `post`) and `?topic=game:<league>:<id>` (`chat`, `chat_deleted`, `reaction`, `presence`). Both send heartbeats every 20 seconds, with up to 6 streams per user.
+- **Live game chat:** messages are up to 280 characters (10 per minute). Reactions: `fire`, `money`, `shock`, `clap`, `cold`, `lock` (40 per minute), one per user per play, or per 15 minutes for the game.
+- **Rate limits:** posting, reacting and commenting are limited to 30 actions per minute per user.
+
 ## Error format
 
 Errors use `{ "error": "..." }`. Validation errors may include a `details` field. Common statuses are 400 (invalid input), 401 (authentication), 404 (not found), 409 (duplicate email), and 429 (rate limit).
