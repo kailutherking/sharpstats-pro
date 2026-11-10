@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-09
+
+### Fixed
+- Requests behind Railway (and other proxies) logged `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`, and every visitor shared the proxy's rate-limit bucket. A few users could then lock everyone out of sign-in (30 attempts per 15 minutes in total). Express now trusts the proxy hops in front of it (`app.set("trust proxy", …)` before any middleware), so `req.ip` is the real client and each rate limiter counts per visitor.
+
+### Added
+- `TRUST_PROXY` setting: hop count (default `1` for Railway, Render or one Nginx; `2` for a Vercel rewrite in front of Railway), a subnet list, or `false` when the API is exposed directly. docker-compose defaults to `false`. `true` is mapped to `1` so clients can't spoof their IP.
+- `GET /health` (and `/api/health`) now also returns `"service": "sharpstats-backend"`.
+
 ## [1.6.0] - 2026-11-09
 
 ### Added
@@ -143,7 +152,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Docker now serves the production frontend through Nginx and prunes development dependencies from the backend image.
 - Odds and analysis features are documented as quota-dependent, on-demand research rather than guaranteed predictions.
 
-[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/kailutherking/sharpstats-pro/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.0...v1.4.1

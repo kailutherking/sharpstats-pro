@@ -24,6 +24,8 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 4000
+      # The API is published directly here (no proxy in front), so X-Forwarded-For is not trusted.
+      TRUST_PROXY: ${TRUST_PROXY:-false}
       CLIENT_ORIGIN: http://localhost:5173
       DEMO_EMAIL: demo@sharpstats.pro
       DEMO_PASSWORD: SharpStats123!

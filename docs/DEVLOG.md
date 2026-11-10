@@ -2,6 +2,14 @@
 
 One entry per completed task, newest first. Commit hashes refer to the feature branch commit; see `git log` for merges.
 
+## 2026-11-09 — Railway trust proxy and rate limiter fix (1.6.1)
+
+- **Feature:** Trust proxy configuration for Railway, Render, Vercel and Nginx; health endpoint service name
+- **Description:** Production on Railway logged `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`, because Express trusted no proxies while Railway sets X-Forwarded-For. Every visitor was also rate-limited as the proxy's IP. Added `app.set("trust proxy", trustProxySetting())` right after `express()`, before any middleware. `TRUST_PROXY` defaults to 1 hop, accepts a hop count, a subnet list or `false`, and maps `true` to 1. Reviewed all 10 rate limiters (auth, stats, odds, injuries, live games, social): they key on `req.ip` or on the signed-in user with `req.ip` as fallback, so all of them now count per client. docker-compose defaults to `TRUST_PROXY=false` (API exposed directly). A regression test confirms that one client hitting the auth limit doesn't block another, and that no `ERR_ERL_` errors are logged. The test fails with `TRUST_PROXY=false`, which reproduces the production bug. `PORT` handling was already `Number(process.env.PORT) || 4000`.
+- **Files changed:** `backend/src/app.ts`, `backend/src/app.test.ts`, `docker-compose.yml`, `.env.example`, `README.md`, `docs/DEPLOYMENT.md`, `CHANGELOG.md`, `RELEASE_NOTES.md`, `package.json` ×3, `package-lock.json`
+- **Commit hash:** fe26bff
+- **Version:** 1.6.1
+
 ## 2026-11-09 — Community, engagement and notification systems (1.6.0)
 
 - **Feature:** Real-inspired social layer: Community page (feed, picks, leaderboards, profiles), follows, reactions and comments, verified picks, badges/XP/levels/streaks, notification center, live game chat and reactions, live bet tracker, mobile bottom navigation, onboarding checklist

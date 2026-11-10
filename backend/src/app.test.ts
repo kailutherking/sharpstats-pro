@@ -1,9 +1,32 @@
 import request from "supertest";
-import { app } from "./app";
+import { app, trustProxySetting } from "./app";
 
 describe("HTTP API", () => {
   it.each(["/health", "/api/health"])("exposes a health check at %s", async (path) => {
-    await request(app).get(path).expect(200, { status: "ok" });
+    await request(app).get(path).expect(200, { status: "ok", service: "sharpstats-backend" });
+  });
+
+  it("trusts one proxy hop by default and never trusts every hop", () => {
+    expect(app.get("trust proxy")).toBe(1);
+    expect(trustProxySetting(undefined)).toBe(1);
+    expect(trustProxySetting("2")).toBe(2);
+    expect(trustProxySetting("false")).toBe(false);
+    expect(trustProxySetting("true")).toBe(1);
+    expect(trustProxySetting("loopback, uniquelocal")).toBe("loopback, uniquelocal");
+  });
+
+  it("rate limits behind a proxy without X-Forwarded-For validation errors, keyed per client IP", async () => {
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      // 30 login attempts per 15 minutes per client: one client hits the limit, another is unaffected.
+      for (let i = 0; i < 30; i += 1) await request(app).post("/api/auth/login").set("X-Forwarded-For", "203.0.113.7").send({});
+      await request(app).post("/api/auth/login").set("X-Forwarded-For", "203.0.113.7").send({}).expect(429);
+      const other = await request(app).post("/api/auth/login").set("X-Forwarded-For", "198.51.100.9").send({});
+      expect(other.status).not.toBe(429);
+      expect(errors.mock.calls.flat().map(String).join(" ")).not.toMatch(/ERR_ERL_/);
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it("protects private routes without access tokens", async () => {
