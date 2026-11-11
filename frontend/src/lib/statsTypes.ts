@@ -1,4 +1,6 @@
-export type League = "nba" | "nfl" | "mlb" | "nhl";
+export type League = "nba" | "nfl" | "mlb" | "nhl" | "ncaab";
+export const LEAGUE_VALUES: League[] = ["nba", "nfl", "mlb", "nhl", "ncaab"];
+export const isLeague = (value: unknown): value is League => LEAGUE_VALUES.includes(value as League);
 export type StatsWindow = "season" | "last10" | "last30";
 export type StatFormat = "int" | "dec1" | "dec2" | "pct1" | "rate3" | "signed" | "minutes" | "innings";
 
@@ -226,6 +228,8 @@ export interface TeamGame {
 }
 
 export interface TeamProfile {
+  /** NCAA only: ATS and over/under records, recent form and strength of schedule. */
+  trends?: import("./simTypes").TeamTrends;
   league: League;
   season: SeasonInfo;
   fetchedAt: string;

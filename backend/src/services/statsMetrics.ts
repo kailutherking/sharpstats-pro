@@ -505,7 +505,122 @@ const nhl: LeagueDefinition = {
   pointsLabel: "Goals",
 };
 
-export const LEAGUE_DEFINITIONS: Record<League, LeagueDefinition> = { nba, nfl, mlb, nhl };
+/* --------------------------- NCAA men's basketball --------------------------- */
+/** College free throws end possessions slightly more often than NBA ones (KenPom/Oliver use 0.475). */
+const NCAA_FT_FACTOR = 0.475;
+function possessions(stats: Stats | undefined, ftFactor: number) {
+  if (!stats) return null;
+  const fga = stats["offensive.avgFieldGoalsAttempted"];
+  const oreb = stats["offensive.avgOffensiveRebounds"];
+  const tov = stats["offensive.avgTurnovers"];
+  const fta = stats["offensive.avgFreeThrowsAttempted"];
+  if ([fga, oreb, tov, fta].some((value) => value === null || value === undefined)) return null;
+  return fga! - oreb! + tov! + ftFactor * fta!;
+}
+/** Possessions per game (40 minutes): the average of both teams' estimates. */
+function ncaaTempo(context: TeamContext) {
+  const own = possessions(context.stats?.own, NCAA_FT_FACTOR);
+  const opponent = possessions(context.stats?.opponent, NCAA_FT_FACTOR);
+  return own === null ? null : opponent === null ? own : (own + opponent) / 2;
+}
+function ncaaRating(context: TeamContext, side: "own" | "opponent") {
+  const tempo = ncaaTempo(context);
+  const points = context.stats?.[side]["offensive.avgPoints"] ?? (side === "own" ? standingValue(context, "avgpointsfor") : standingValue(context, "avgpointsagainst"));
+  return tempo && points !== null ? points / tempo * 100 : null;
+}
+const ratio = (top: number | null | undefined, bottom: number | null | undefined, scale = 100) =>
+  top === null || top === undefined || !bottom ? null : top / bottom * scale;
+function effectiveFgPct(stats: Stats | undefined, prefix = "offensive.avg") {
+  if (!stats) return null;
+  const made = stats[`${prefix}FieldGoalsMade`];
+  const threes = stats[`${prefix}ThreePointFieldGoalsMade`];
+  return made === null || made === undefined || threes === null || threes === undefined ? null : ratio(made + 0.5 * threes, stats[`${prefix}FieldGoalsAttempted`]);
+}
+function trueShootingPct(stats: Stats) {
+  const fga = stats["offensive.avgFieldGoalsAttempted"];
+  const fta = stats["offensive.avgFreeThrowsAttempted"];
+  if (fga === null || fga === undefined || fta === null || fta === undefined) return null;
+  return ratio(stats["offensive.avgPoints"], 2 * (fga + 0.44 * fta));
+}
+function reboundPct(context: TeamContext, kind: "offensive" | "total") {
+  const own = context.stats?.own;
+  const opponent = context.stats?.opponent;
+  if (!own || !opponent) return null;
+  if (kind === "offensive") {
+    const oreb = own["offensive.avgOffensiveRebounds"];
+    const oppDreb = opponent["defensive.avgDefensiveRebounds"];
+    return oreb === null || oreb === undefined || oppDreb === null || oppDreb === undefined ? null : ratio(oreb, oreb + oppDreb);
+  }
+  const reb = own["general.avgRebounds"];
+  const oppReb = opponent["general.avgRebounds"];
+  return reb === null || reb === undefined || oppReb === null || oppReb === undefined ? null : ratio(reb, reb + oppReb);
+}
+const windowEfg = (games: ProviderGame[]) => {
+  const attempts = total(games, ["fieldGoalsAttempted"]);
+  return attempts > 0 ? (total(games, ["fieldGoalsMade"]) + 0.5 * total(games, ["threePointFieldGoalsMade"])) / attempts * 100 : null;
+};
+const windowTs = (games: ProviderGame[]) => {
+  const bottom = 2 * (total(games, ["fieldGoalsAttempted"]) + 0.44 * total(games, ["freeThrowsAttempted"]));
+  return bottom > 0 ? total(games, ["points"]) / bottom * 100 : null;
+};
+const ncaabMetrics = index([
+  ...Object.values(nbaMetrics),
+  // The provider reports 0 until it has computed a rating (the first weeks of a season).
+  metric("per", "Player efficiency rating", "PER", "dec1", (stats) => stats["general.PER"] || null),
+  // Injected by stats.service from the player's and team's per-game totals (ESPN does not publish it).
+  metric("usg", "Usage rate", "USG%", "pct1", stat("derived.usageRate")),
+  metric("efgPct", "Effective field goal percentage", "eFG%", "pct1", (stats) => effectiveFgPct(stats), windowEfg),
+  metric("tsPct", "True shooting percentage", "TS%", "pct1", trueShootingPct, windowTs),
+]);
+const ncaab: LeagueDefinition = {
+  ...nba,
+  league: "ncaab",
+  name: "NCAA Men's Basketball",
+  metrics: ncaabMetrics,
+  groups: [{
+    ...nba.groups[0]!,
+    columns: ["gp", "min", "pts", "reb", "ast", "stl", "blk", "tov", "fgPct", "tpPct", "ftPct", "tpm", "pra", "usg", "per", "efgPct", "tsPct"],
+    props: [
+      prop("points", "Points", "PTS", gameValue("points"), [8, 10, 12, 15, 18, 20, 25, 30]),
+      prop("rebounds", "Rebounds", "REB", gameValue("totalRebounds"), [3, 4, 5, 6, 8, 10, 12]),
+      prop("assists", "Assists", "AST", gameValue("assists"), [2, 3, 4, 5, 6, 8]),
+      prop("threes", "3-pointers made", "3PM", gameValue("threePointFieldGoalsMade"), [1, 2, 3, 4, 5]),
+      prop("pra", "Pts + Reb + Ast", "PRA", gameSum("points", "totalRebounds", "assists"), [12, 15, 18, 20, 25, 30, 35, 40]),
+      prop("stocks", "Steals + Blocks", "STL+BLK", gameSum("steals", "blocks"), [1, 2, 3, 4]),
+    ],
+  }],
+  leaders: [
+    ...nba.leaders,
+    { metric: "per", group: "players", qualify: (a) => hasTag("qualified")(a) && (a.stats["general.avgMinutes"] ?? 0) >= 15 },
+    { metric: "usg", group: "players", qualify: (a) => hasTag("qualified")(a) && (a.stats["general.avgMinutes"] ?? 0) >= 15 },
+  ],
+  teamMetrics: [
+    pointsForPerGame,
+    pointsAgainstPerGame,
+    { key: "offRating", label: "Offensive rating (points per 100 possessions)", short: "ORTG", format: "dec1", direction: "desc", compute: (c) => ncaaRating(c, "own") },
+    { key: "defRating", label: "Defensive rating (points allowed per 100 possessions)", short: "DRTG", format: "dec1", direction: "asc", compute: (c) => ncaaRating(c, "opponent") },
+    { key: "netRating", label: "Net rating", short: "NET RTG", format: "signed", direction: "desc", compute: (c) => { const o = ncaaRating(c, "own"); const d = ncaaRating(c, "opponent"); return o === null || d === null ? null : o - d; } },
+    { key: "pace", label: "Tempo / pace (possessions per 40 minutes)", short: "TEMPO", format: "dec1", direction: "desc", compute: ncaaTempo },
+    { key: "efgPct", label: "Effective field goal %", short: "eFG%", format: "pct1", direction: "desc", compute: (c) => effectiveFgPct(c.stats?.own) },
+    { key: "tovPct", label: "Turnover % (turnovers per 100 possessions)", short: "TOV%", format: "pct1", direction: "asc", compute: (c) => ratio(c.stats?.own["offensive.avgTurnovers"], possessions(c.stats?.own, NCAA_FT_FACTOR)) },
+    { key: "orbPct", label: "Offensive rebounding %", short: "ORB%", format: "pct1", direction: "desc", compute: (c) => reboundPct(c, "offensive") },
+    { key: "rebPct", label: "Total rebounding %", short: "REB%", format: "pct1", direction: "desc", compute: (c) => reboundPct(c, "total") },
+    { key: "ftRate", label: "Free throw rate (FTA per FGA)", short: "FTR", format: "pct1", direction: "desc", compute: (c) => ratio(c.stats?.own["offensive.avgFreeThrowsAttempted"], c.stats?.own["offensive.avgFieldGoalsAttempted"]) },
+    { key: "tpPct", label: "3-point percentage", short: "3P%", format: "pct1", direction: "desc", compute: teamStat("own", "offensive.threePointFieldGoalPct") },
+  ],
+  unavailableMetrics: [],
+};
+
+/** Usage rate from per-game averages: the share of team possessions a player ends while on the floor. */
+export function usageRate(player: Stats, team: Stats | undefined): number | null {
+  const minutes = player["general.avgMinutes"];
+  const used = possessions({ ...player, "offensive.avgOffensiveRebounds": 0 }, 0.44);
+  const teamUsed = possessions(team ? { ...team, "offensive.avgOffensiveRebounds": 0 } : undefined, 0.44);
+  if (!minutes || minutes < 5 || used === null || !teamUsed) return null;
+  return Math.min(60, 100 * used * 40 / (minutes * teamUsed));
+}
+
+export const LEAGUE_DEFINITIONS: Record<League, LeagueDefinition> = { nba, nfl, mlb, nhl, ncaab };
 
 /** Picks the position group used for a player's profile, game log and props. */
 export function primaryGroup(definition: LeagueDefinition, athlete: Pick<ProviderAthlete, "position" | "stats" | "tags" | "id">): PlayerGroupDef {

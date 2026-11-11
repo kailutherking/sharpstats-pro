@@ -2,7 +2,7 @@ import type { League } from "../../lib/statsTypes";
 import type { LiveGame, LiveStatus } from "../../lib/liveTypes";
 import { inProgress } from "../../lib/liveTypes";
 
-export const SPREAD_LABEL: Record<League, string> = { nba: "Spread", nfl: "Spread", mlb: "Run line", nhl: "Puck line" };
+export const SPREAD_LABEL: Record<League, string> = { nba: "Spread", nfl: "Spread", mlb: "Run line", nhl: "Puck line", ncaab: "Spread" };
 
 export function StatusBadge({ game }: { game: Pick<LiveGame, "status" | "statusLabel" | "clock" | "periodLabel" | "startTime"> }) {
   if (game.status === "pregame") {

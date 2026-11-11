@@ -93,7 +93,12 @@ router.patch("/:id", async (req: AuthRequest, res, next) => {
       res.status(404).json({ error: "Bet not found" });
       return;
     }
-    const current = existing.rows[0] as BetRow;
+    const current = existing.rows[0] as BetRow & { source?: string };
+    if (current.source === "simulated") {
+      await client.query("ROLLBACK");
+      res.status(409).json({ error: "Simulated wagers are graded automatically. Cancel an open one from Open wagers instead." });
+      return;
+    }
     const merged = { ...current, ...data };
     const profitLoss = calculateProfitLoss(merged.result, Number(merged.odds), Number(merged.stake));
     const result = await client.query(
@@ -132,10 +137,12 @@ router.delete("/:id", async (req: AuthRequest, res, next) => {
   try {
     client = await pool.connect();
     await client.query("BEGIN");
-    const result = await client.query("DELETE FROM bets WHERE id = $1 AND user_id = $2", [id, req.user!.id]);
+    // Simulated wagers hold bankroll and ledger entries; they are cancelled or settled, never deleted.
+    const result = await client.query("DELETE FROM bets WHERE id = $1 AND user_id = $2 AND source <> 'simulated'", [id, req.user!.id]);
     if (result.rowCount === 0) {
       await client.query("ROLLBACK");
-      res.status(404).json({ error: "Bet not found" });
+      const simulated = await pool.query("SELECT 1 FROM bets WHERE id=$1 AND user_id=$2 AND source='simulated'", [id, req.user!.id]);
+      res.status(simulated.rowCount ? 409 : 404).json({ error: simulated.rowCount ? "Simulated wagers cannot be deleted. Cancel an open one from Open wagers instead." : "Bet not found" });
       return;
     }
     await syncBankroll(client, req.user!.id);

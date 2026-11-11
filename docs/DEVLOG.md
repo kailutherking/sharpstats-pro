@@ -2,6 +2,14 @@
 
 One entry per completed task, newest first. Commit hashes refer to the feature branch commit; see `git log` for merges.
 
+## 2026-11-10 — NCAA Division I men's basketball and simulated betting (1.7.0)
+
+- **Feature:** NCAA D-I men's basketball across Stats, Odds, Live games, Injuries and the Bet tracker; simulated betting system integrated with the bankroll
+- **Description:** Added `ncaab` as a league (32 conferences, 365 programs, read from ESPN each refresh). College team metrics (ORTG/DRTG/net, tempo, eFG%, TOV%, ORB%/REB%, FT rate), player PER, derived usage rate, eFG% and TS%. AP/Coaches (ESPN), NET (NCAA.com mirror) and optional KenPom rankings, conference standings, ATS and over/under records from DraftKings closing lines, strength of schedule, NCAA futures. Odds catalog gained NCAAB with 1st- and 2nd-half markets. Simulated bet slip priced server-side from the live board with price-change protection, stakes reserved against the bankroll, automatic grading (spreads, totals, team totals, moneylines, halves, basketball props, parlay reduction on pushes and voids), transaction ledger, and simulation analytics. Fixed empty college game logs.
+- **Files changed:** 57 files. New: `backend/src/db/migrations/004_ncaa_sim_betting.sql`, `providers/ncaaData.ts`, `services/ncaa.service.ts`, `services/ncaaTrends.ts`, `services/simGrading.ts`, `services/simBetting.service.ts`, `routes/ncaa.routes.ts`, `routes/simBetting.routes.ts`, tests `providers/ncaaData.test.ts`, `services/simGrading.test.ts`; frontend `components/sim/*`, `components/ncaa/NcaaHub.tsx`, `lib/simTypes.ts`, `lib/betSlipStore.ts`. Modified: stats, odds, live, injury, grading and bankroll code, Prisma schema, App shell, Odds/Stats pages, docs.
+- **Commit hash:** 51e8ddd
+- **Version:** 1.7.0
+
 ## 2026-11-09 — Railway trust proxy and rate limiter fix (1.6.1)
 
 - **Feature:** Trust proxy configuration for Railway, Render, Vercel and Nginx; health endpoint service name

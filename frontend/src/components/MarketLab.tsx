@@ -14,6 +14,7 @@ const sports = [
   { label: "NFL", key: "americanfootball_nfl" },
   { label: "MLB", key: "baseball_mlb" },
   { label: "NHL", key: "icehockey_nhl" },
+  { label: "NCAAB", key: "basketball_ncaab" },
 ];
 const money = (value: number) => `${value < 0 ? "-" : ""}$${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (value: number) => `${value >= 0 ? "+" : ""}${(value * 100).toFixed(2)}%`;

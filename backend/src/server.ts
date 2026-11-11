@@ -7,7 +7,7 @@ dotenv.config({ path: process.env.ENV_FILE ?? "../.env" });
 const PORT = Number(process.env.PORT) || 4000;
 
 async function start(): Promise<void> {
-  const [{ app }, { pool }, { runMigrations }, { prisma }, { seedDemoAccount }, { startStatsRefreshScheduler }, { startOddsScheduler }, { startInjuryScheduler }, { startLiveBetScanner }, { startSocialMaintenance }] = await Promise.all([
+  const [{ app }, { pool }, { runMigrations }, { prisma }, { seedDemoAccount }, { startStatsRefreshScheduler }, { startOddsScheduler }, { startInjuryScheduler }, { startLiveBetScanner }, { startSocialMaintenance }, { startNcaaSync }, { startSimGradingScheduler }] = await Promise.all([
     import("./app"),
     import("./db/pool"),
     import("./db/migrate"),
@@ -18,6 +18,8 @@ async function start(): Promise<void> {
     import("./services/injury.service"),
     import("./services/social/liveBetTracker.service"),
     import("./services/social/maintenance"),
+    import("./services/ncaa.service"),
+    import("./services/simBetting.service"),
   ]);
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 24) {
     throw new Error("Set JWT_SECRET to a secret of at least 24 characters");
@@ -38,12 +40,16 @@ async function start(): Promise<void> {
   const stopInjuryRefresh = startInjuryScheduler();
   const stopLiveBets = startLiveBetScanner();
   const stopSocial = startSocialMaintenance();
+  const stopNcaaSync = startNcaaSync();
+  const stopSimGrading = startSimGradingScheduler();
   const shutdown = () => server.close(() => {
     stopStatsRefresh();
     stopOddsRefresh();
     stopInjuryRefresh();
     stopLiveBets();
     stopSocial();
+    stopNcaaSync();
+    stopSimGrading();
     void Promise.all([pool.end(), prisma.$disconnect()]).then(() => process.exit(0));
   });
   process.on("SIGTERM", shutdown);

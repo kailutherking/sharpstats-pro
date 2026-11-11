@@ -2,21 +2,25 @@
  * Sports statistics provider adapters.
  *
  * ESPN's public JSON feeds (site.api.espn.com / site.web.api.espn.com) supply player, team,
- * standings, game log and career data for the NBA, NFL, MLB and NHL. The MLB Stats API
+ * standings, game log and career data for the NBA, NFL, MLB, NHL and NCAA Division I men's basketball. The MLB Stats API
  * (statsapi.mlb.com) supplies MLB bullpen splits, which ESPN does not publish.
  * Neither requires an API key. Both are unofficial for third-party use: review their terms
  * before deploying commercially.
  */
 
-export type League = "nba" | "nfl" | "mlb" | "nhl";
-export const LEAGUES: League[] = ["nba", "nfl", "mlb", "nhl"];
+export type League = "nba" | "nfl" | "mlb" | "nhl" | "ncaab";
+export const LEAGUES: League[] = ["nba", "nfl", "mlb", "nhl", "ncaab"];
+/** ESPN group 50 is NCAA Division I; without it the college scoreboard only lists ranked teams. */
+export const NCAAB_SCOREBOARD_PARAMS = "groups=50&limit=400";
 
 const LEAGUE_PATHS: Record<League, string> = {
   nba: "basketball/nba",
   nfl: "football/nfl",
   mlb: "baseball/mlb",
   nhl: "hockey/nhl",
+  ncaab: "basketball/mens-college-basketball",
 };
+export const leaguePath = (league: League) => LEAGUE_PATHS[league];
 
 const SITE_API = (process.env.ESPN_SITE_API_URL ?? "https://site.api.espn.com").replace(/\/+$/, "");
 const WEB_API = (process.env.ESPN_WEB_API_URL ?? "https://site.web.api.espn.com").replace(/\/+$/, "");
@@ -111,6 +115,8 @@ interface ByAthleteResponse {
 export interface AthletePoolQuery {
   params: string;
   tag?: string;
+  /** Follow the provider's pagination (up to this many pages) instead of reading one page. */
+  maxPages?: number;
 }
 
 /** The provider caps pages at 1000 rows. Several sort orders cover every position group. */
@@ -129,6 +135,10 @@ export const ATHLETE_POOL_QUERIES: Record<League, AthletePoolQuery[]> = {
     { params: "isqualified=true&limit=300&sort=pitching.ERA:asc", tag: "qualifiedPitching" },
     { params: "isqualified=false&limit=1000" },
     { params: "isqualified=false&limit=1000&sort=pitching.innings:desc" },
+  ],
+  // ~5,500 qualified Division I players: six pages of 1,000 (the provider's page cap).
+  ncaab: [
+    { params: "isqualified=true&limit=1000", tag: "qualified", maxPages: 12 },
   ],
   nfl: [
     { params: "isqualified=false&limit=150&sort=passing.passingYards:desc" },
@@ -178,10 +188,20 @@ function seasonFrom(payload: ByAthleteResponse): SeasonInfo | null {
   return season ? { year: season.year, displayName: season.displayName, type: "Regular Season" } : null;
 }
 
-async function fetchByAthlete(league: League, params: string): Promise<ByAthleteResponse> {
-  return fetchJson<ByAthleteResponse>(
+async function fetchByAthletePage(league: League, params: string): Promise<ByAthleteResponse & { pagination?: { count: number; pages?: number } }> {
+  return fetchJson(
     `${WEB_API}/apis/common/v3/sports/${LEAGUE_PATHS[league]}/statistics/byathlete?region=us&lang=en&contentorigin=espn&seasontype=2&${params}`,
   );
+}
+
+async function fetchByAthlete(league: League, params: string, maxPages = 1): Promise<ByAthleteResponse> {
+  const first = await fetchByAthletePage(league, params);
+  const pages = Math.min(maxPages, first.pagination?.pages ?? 1);
+  if (pages <= 1) return first;
+  // Later pages are best-effort: a failed page narrows the pool instead of failing the league.
+  const rest = await Promise.allSettled(Array.from({ length: pages - 1 }, (_, index) => fetchByAthletePage(league, `${params}&page=${index + 2}`)));
+  for (const page of rest) if (page.status === "fulfilled") first.athletes.push(...page.value.athletes);
+  return first;
 }
 
 /**
@@ -191,17 +211,17 @@ async function fetchByAthlete(league: League, params: string): Promise<ByAthlete
 export async function fetchAthletePool(league: League): Promise<{ season: SeasonInfo; athletes: ProviderAthlete[] }> {
   const queries = ATHLETE_POOL_QUERIES[league];
   let seasonParam = "";
-  let first = await fetchByAthlete(league, queries[0]!.params);
+  let first = await fetchByAthlete(league, queries[0]!.params, queries[0]!.maxPages);
   let season = seasonFrom(first);
   if (!first.athletes.length && season) {
     seasonParam = `&season=${season.year - 1}`;
-    first = await fetchByAthlete(league, `${queries[0]!.params}${seasonParam}`);
+    first = await fetchByAthlete(league, `${queries[0]!.params}${seasonParam}`, queries[0]!.maxPages);
     season = seasonFrom(first);
   } else if (season) {
     seasonParam = `&season=${season.year}`;
   }
   // Supplementary sort orders widen coverage; one failing must not discard the rest.
-  const rest = await Promise.allSettled(queries.slice(1).map((query) => fetchByAthlete(league, `${query.params}${seasonParam}`)));
+  const rest = await Promise.allSettled(queries.slice(1).map((query) => fetchByAthlete(league, `${query.params}${seasonParam}`, query.maxPages)));
   const merged = new Map<string, ProviderAthlete>();
   const payloads = [first, ...rest.map((result, index) => {
     if (result.status === "fulfilled") return result.value;
@@ -248,7 +268,8 @@ interface StandingsNode {
 export function normalizeStandings(root: StandingsNode): ProviderStanding[] {
   const rows: ProviderStanding[] = [];
   const walk = (node: StandingsNode, conference: StandingsNode | null) => {
-    const nextConference = conference ?? (node.children?.length && node !== root ? node : null);
+    // College conferences are leaves (no divisions); pro conferences contain division nodes.
+    const nextConference = conference ?? (node !== root && (node.children?.length || node.isConference) ? node : null);
     for (const entry of node.standings?.entries ?? []) {
       const stats: ProviderStanding["stats"] = {};
       for (const stat of entry.stats) {
@@ -264,7 +285,7 @@ export function normalizeStandings(root: StandingsNode): ProviderStanding[] {
         logo: entry.team.logos?.[0]?.href ?? null,
         conference: nextConference?.name ?? "",
         conferenceAbbr: nextConference?.abbreviation ?? "",
-        division: node.name ?? "",
+        division: node === nextConference ? "" : node.name ?? "",
         stats,
       });
     }
@@ -313,9 +334,14 @@ export function normalizeTeamStats(payload: ByTeamResponse): Map<string, Provide
 }
 
 export async function fetchTeamStats(league: League, season: number): Promise<Map<string, ProviderTeamStats>> {
-  const payload = await fetchJson<ByTeamResponse>(
-    `${WEB_API}/apis/common/v3/sports/${LEAGUE_PATHS[league]}/statistics/byteam?region=us&lang=en&contentorigin=espn&limit=50&season=${season}&seasontype=2`,
-  );
+  const url = (page: number) => `${WEB_API}/apis/common/v3/sports/${LEAGUE_PATHS[league]}/statistics/byteam?region=us&lang=en&contentorigin=espn&limit=${league === "ncaab" ? 400 : 50}&season=${season}&seasontype=2&page=${page}`;
+  const payload = await fetchJson<ByTeamResponse & { pagination?: { pages?: number } }>(url(1));
+  const pages = Math.min(6, payload.pagination?.pages ?? 1);
+  for (let page = 2; page <= pages; page += 1) {
+    // The provider reports more pages than it fills (teams without games have no row), so a page may come back without `teams`.
+    const next = await fetchJson<Partial<ByTeamResponse>>(url(page)).catch(() => null);
+    if (next?.teams?.length) payload.teams.push(...next.teams);
+  }
   return normalizeTeamStats(payload);
 }
 
@@ -361,7 +387,7 @@ interface GameLogResponse {
     team?: { id?: string };
     opponent?: { id?: string; abbreviation?: string; displayName?: string; logo?: string };
   }>;
-  seasonTypes?: Array<{ displayName: string; categories?: Array<{ events?: Array<{ eventId: string; stats: string[] }> }> }>;
+  seasonTypes?: Array<{ displayName: string; categories?: Array<{ displayName?: string; events?: Array<{ eventId: string; stats: string[] }> }> }>;
 }
 
 /** Splits composite provider columns such as `fieldGoalsMade-fieldGoalsAttempted` ("17-33"). */
@@ -372,8 +398,11 @@ export function normalizeGameLog(payload: GameLogResponse): ProviderGameLog {
   const games: ProviderGame[] = [];
   const seen = new Set<string>();
   for (const seasonType of payload.seasonTypes ?? []) {
-    if (!/regular season/i.test(seasonType.displayName)) continue;
+    // Pro leagues label the season type ("2025-26 Regular Season"); college labels the category
+    // instead ("2026-27 Season" → "Regular Season Stats").
+    const regularType = /regular season/i.test(seasonType.displayName);
     for (const category of seasonType.categories ?? []) {
+      if (!regularType && !/regular season/i.test(category.displayName ?? "")) continue;
       for (const row of category.events ?? []) {
         const event = payload.events?.[row.eventId];
         if (!event || seen.has(row.eventId)) continue;

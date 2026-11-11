@@ -16,7 +16,7 @@ const LIST_TTL_MS = 10_000;
 const DETAIL_TTL_MS = 10_000;
 const CLOSING_TTL_MS = 5 * 60_000;
 const TRACKED_BOOKS = ["fanduel", "draftkings", "betmgm", "caesars", "prizepicks", "underdog", "espnbet", "fanatics"];
-export const LIVE_SOURCE = "ESPN scoreboard and game feeds · NHL official API (power play) · The Odds API (sportsbook prices)";
+export const LIVE_SOURCE = "ESPN scoreboard and game feeds (NBA, NFL, MLB, NHL, NCAA D-I men's basketball) · NHL official API (power play) · The Odds API (sportsbook prices)";
 
 /* ---------- Odds matching ---------- */
 
@@ -105,7 +105,7 @@ export function statusLabel(league: League, status: LiveStatus, detail: string):
   switch (status) {
     case "pregame": return "Pregame";
     case "halftime": return "Halftime";
-    case "end_period": return league === "nhl" ? "End of Period" : league === "mlb" ? detail || "End of inning" : "End of Quarter";
+    case "end_period": return league === "nhl" ? "End of Period" : league === "ncaab" ? "End of Half" : league === "mlb" ? detail || "End of inning" : "End of Quarter";
     case "final": return /OT|SO/i.test(detail) ? detail : "Final";
     case "delayed": return detail || "Delayed";
     case "postponed": return detail || "Postponed";
@@ -411,7 +411,7 @@ const perGame = (key: string, games: string) => (row: PlayerRow) => {
 };
 const avg = (key: string) => (row: PlayerRow) => row.values[key] ?? null;
 
-export const PROP_DEFS: Record<League, PropDef[]> = {
+const PRO_PROP_DEFS: Record<Exclude<League, "ncaab">, PropDef[]> = {
   nba: [
     { key: "points", label: "Points", groups: ["players"], current: v("points"), season: avg("pts"), market: "player_points", dispersion: 2.3 },
     { key: "rebounds", label: "Rebounds", groups: ["players"], current: v("rebounds"), season: avg("reb"), market: "player_rebounds", dispersion: 1.3 },
@@ -445,6 +445,8 @@ export const PROP_DEFS: Record<League, PropDef[]> = {
     { key: "saves", label: "Goalie saves", groups: ["goalies"], current: v("saves"), season: perGame("sv", "ggp"), market: "player_total_saves", dispersion: 1.3 },
   ],
 };
+/** College box scores use the same stat keys as the NBA. */
+export const PROP_DEFS: Record<League, PropDef[]> = { ...PRO_PROP_DEFS, ncaab: PRO_PROP_DEFS.nba };
 
 /** Clock text to minutes remaining: "5:32" → 5.53; NBA's final-minute "45.2" means seconds. */
 export function clockMinutes(clock: string | null): number | null {
@@ -469,7 +471,7 @@ export function gameProgress(game: Pick<ProviderLiveGame, "league" | "status" | 
     else if (/^bot/.test(detail)) halves += 1;
     return Math.min(0.99, (halves + partial) / 18);
   }
-  const [periodLength, regulationPeriods, overtimeLength] = game.league === "nba" ? [12, 4, 5] : game.league === "nfl" ? [15, 4, 10] : [20, 3, 5];
+  const [periodLength, regulationPeriods, overtimeLength] = game.league === "nba" ? [12, 4, 5] : game.league === "ncaab" ? [20, 2, 5] : game.league === "nfl" ? [15, 4, 10] : [20, 3, 5];
   const regulation = periodLength * regulationPeriods;
   const inOvertime = game.period > regulationPeriods;
   const length = inOvertime ? overtimeLength : periodLength;
@@ -582,8 +584,9 @@ export async function getLivePlayer(league: League, eventId: string, playerId: s
   const target = normalizeName(first.player.name);
   const props = oddsGame ? odds!.selections.filter((selection) => selection.gameId === oddsGame.id && selection.category === "prop" && normalizeName(selection.participant) === target) : [];
   const names = new Map(getBooks().map((book) => [book.key, book.name]));
-  const minutesPlayed = league === "nba" ? values.minutes ?? null : null;
-  const seasonMinutes = league === "nba" ? season?.values.min ?? null : null;
+  const basketball = league === "nba" || league === "ncaab";
+  const minutesPlayed = basketball ? values.minutes ?? null : null;
+  const seasonMinutes = basketball ? season?.values.min ?? null : null;
 
   const tracks = PROP_DEFS[league].filter((def) => def.groups.some((group) => groups.has(group))).map((def): PlayerPropTrack => {
     const current = def.current(values);

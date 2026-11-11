@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { LineChart, Plus } from "lucide-react";
+import { LineChart, Plus, ReceiptText } from "lucide-react";
 import type { BookInfo, BookPrice, OddsGame, Selection, Sizing } from "../../lib/oddsTypes";
 import { american, lineMoveText, pct, priceLine, recommendedStake, money, signedPct, startTime, timeAgo } from "../../lib/oddsFormat";
 import { EmptyState, Segmented, SortHeader, thClass } from "../stats/StatsUi";
@@ -42,7 +42,7 @@ function sortRows(rows: BoardRow[], key: SortKey, direction: "asc" | "desc"): Bo
   });
 }
 
-export function MarketBoard({ selections, games, books, sizing, bookFilter, onHistory, onTrack, onGame }: {
+export function MarketBoard({ selections, games, books, sizing, bookFilter, onHistory, onTrack, onSlip, onGame }: {
   selections: Selection[];
   games: Map<string, OddsGame>;
   books: BookInfo[];
@@ -50,6 +50,8 @@ export function MarketBoard({ selections, games, books, sizing, bookFilter, onHi
   bookFilter: string;
   onHistory: (selection: Selection) => void;
   onTrack: (selection: Selection, price: BookPrice) => void;
+  /** Adds the price to the simulated bet slip. */
+  onSlip?: (selection: Selection, price: BookPrice) => void;
   onGame: (gameId: string) => void;
 }) {
   const [mode, setMode] = useState<"best" | "all">("best");
@@ -129,7 +131,8 @@ export function MarketBoard({ selections, games, books, sizing, bookFilter, onHi
                     <td className="px-4 py-3 text-right align-middle">
                       <span className="inline-flex gap-1">
                         <button type="button" onClick={() => onHistory(selection)} aria-label={`Line history for ${selection.label}`} title="Line movement & odds history" className="rounded-md border border-line p-1.5 text-muted hover:border-lime hover:text-lime"><LineChart size={12} /></button>
-                        <button type="button" onClick={() => onTrack(selection, price)} aria-label={`Track ${selection.label} at ${price.book}`} title="Log this bet" className="rounded-md border border-line p-1.5 text-muted hover:border-lime hover:text-lime"><Plus size={12} /></button>
+                        {onSlip && <button type="button" onClick={() => onSlip(selection, price)} aria-label={`Add ${selection.label} at ${price.book} to the bet slip`} title="Add to simulated bet slip" className="rounded-md border border-[#3b4a2c] bg-[#1a2118] p-1.5 text-lime hover:bg-[#243020]"><ReceiptText size={12} /></button>}
+                        <button type="button" onClick={() => onTrack(selection, price)} aria-label={`Track ${selection.label} at ${price.book}`} title="Log a bet you placed elsewhere" className="rounded-md border border-line p-1.5 text-muted hover:border-lime hover:text-lime"><Plus size={12} /></button>
                       </span>
                     </td>
                   </tr>

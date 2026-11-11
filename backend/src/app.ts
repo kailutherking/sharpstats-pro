@@ -16,6 +16,8 @@ import injuryRoutes from "./routes/injury.routes";
 import socialRoutes from "./routes/social.routes";
 import notificationRoutes from "./routes/notifications.routes";
 import realtimeRoutes from "./routes/realtime.routes";
+import ncaaRoutes from "./routes/ncaa.routes";
+import { betSlipRouter, openBetsRouter, simRouter } from "./routes/simBetting.routes";
 import { errorHandler, notFound } from "./middleware/errors";
 
 /**
@@ -60,6 +62,10 @@ app.get(["/health", "/api/health"], (_req, res) => res.json({ status: "ok", serv
 app.use("/api/bets", betRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/bankroll", bankrollRoutes);
+app.use("/api/ncaa", ncaaRoutes);
+app.use("/api/bet-slip", betSlipRouter);
+app.use("/api/open-bets", openBetsRouter);
+app.use("/api/sim", simRouter);
 app.use("/api/odds", oddsPlatformRoutes);
 app.use("/api", oddsRoutes);
 app.use("/api/profile", profileRoutes);
