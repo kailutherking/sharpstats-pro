@@ -23,7 +23,7 @@ export async function pruneFeedEvents(): Promise<void> {
 
 export interface NewsItem { id: string; league: League; headline: string; description: string | null; published: string; link: string | null; image: string | null; category: "news" | "trade" }
 
-const PATHS: Record<League, string> = { nba: "basketball/nba", nfl: "football/nfl", mlb: "baseball/mlb", nhl: "hockey/nhl" };
+const PATHS: Record<League, string> = { nba: "basketball/nba", nfl: "football/nfl", mlb: "baseball/mlb", nhl: "hockey/nhl", ncaab: "basketball/mens-college-basketball" };
 const SITE_API = (process.env.ESPN_SITE_API_URL ?? "https://site.api.espn.com").replace(/\/+$/, "");
 const TRADE_WORDS = /\b(trade[sd]?|acquire[sd]?|deal|sign(s|ed|ing)?|waive[sd]?|release[sd]?|extension|claimed)\b/i;
 
@@ -57,7 +57,7 @@ export type FeedFilter = "all" | "picks" | "wins" | "news" | "injuries" | "marke
 export interface FeedEventView { id: number; type: string; league: string | null; title: string; body: string; ref: Record<string, unknown>; actor: { handle: string; name: string; avatarUrl: string | null } | null; createdAt: string }
 export type FeedItem = { kind: "post"; at: string; post: PostView } | { kind: "event"; at: string; event: FeedEventView } | { kind: "news"; at: string; news: NewsItem };
 
-const LEAGUES: League[] = ["nba", "nfl", "mlb", "nhl"];
+const LEAGUES: League[] = ["nba", "nfl", "mlb", "nhl", "ncaab"];
 
 /**
  * Home feed: picks and posts (people you follow, or everyone), big wins and badges, injury news

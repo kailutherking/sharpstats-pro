@@ -18,7 +18,7 @@ const LEAGUE_KEY = "sharpstats_injury_league";
 function storedLeague(): League {
   try {
     const value = localStorage.getItem(LEAGUE_KEY);
-    return value === "nba" || value === "nfl" || value === "mlb" || value === "nhl" ? value : "nba";
+    return value === "nba" || value === "nfl" || value === "mlb" || value === "nhl" || value === "ncaab" ? value : "nba";
   } catch {
     return "nba";
   }

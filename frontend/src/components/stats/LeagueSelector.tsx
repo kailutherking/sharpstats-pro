@@ -5,11 +5,12 @@ export const LEAGUE_OPTIONS: Array<{ value: League; label: string; sport: string
   { value: "nfl", label: "NFL", sport: "Football" },
   { value: "mlb", label: "MLB", sport: "Baseball" },
   { value: "nhl", label: "NHL", sport: "Hockey" },
+  { value: "ncaab", label: "NCAAB", sport: "College basketball" },
 ];
 
 export function LeagueSelector({ value, onChange }: { value: League; onChange: (league: League) => void }) {
   return (
-    <div role="tablist" aria-label="League" className="grid grid-cols-4 gap-1 rounded-xl border border-line bg-[#0c1114] p-1 sm:inline-grid">
+    <div role="tablist" aria-label="League" className="grid grid-cols-5 gap-1 rounded-xl border border-line bg-[#0c1114] p-1 sm:inline-grid">
       {LEAGUE_OPTIONS.map((option) => (
         <button
           key={option.value}

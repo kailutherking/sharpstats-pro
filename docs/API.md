@@ -62,6 +62,40 @@ All stats routes require authentication. `:league` is `nba`, `nfl`, `mlb` or `nh
 
 Data comes from ESPN's public stats feeds, plus MLB Stats API relief splits for bullpen ERA. Responses are cached in memory and in the `stats_cache` table for `STATS_REFRESH_MINUTES` (default 15). A background job re-fetches every league on that interval. If a provider fails, the last saved copy is served with `stale: true`. Manual refreshes (`POST .../refresh`, or `refresh=true` on profile routes) are limited to six per minute. `last10`/`last30` form views recalculate stats from game logs for the highest-volume players in each position group. Team tables always use full-season data. NFL EPA and DVOA are not published by these providers and are listed in `unavailableMetrics`. Provider failures with no saved copy return 502.
 
+## NCAA men's basketball
+
+`ncaab` is also a valid `league` for `/stats/*`, `/live-games/*` and `/injuries/*`, and a valid `sport` for `/odds/*`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/ncaa/stats?conference=&window=` | Team table (ratings, tempo, four factors), leaders and conference standings |
+| GET | `/ncaa/players?team=&conference=&position=&search=&sort=&order=&limit=&offset=&window=` | Paged player stats (default 50, max 500 per page) |
+| GET | `/ncaa/teams?conference=&search=&ranked=` | Teams with records and AP / Coaches / NET / KenPom ranks |
+| GET | `/ncaa/rankings?poll=&limit=` | Polls (`ap`, `coaches`, `net`, `kenpom`) and the reason any poll is unavailable |
+| GET | `/ncaa/conferences?conference=` | Standings for every conference (or one) |
+| GET | `/ncaa/live-games` | Today's Division I slate with scores, clocks, win probability and lines |
+| GET | `/ncaa/futures` | National title, Final Four and conference futures (DraftKings via ESPN) |
+
+`/stats/team/:id?league=ncaab` adds `trends`: ATS and over/under records, Last 5 / Last 10 form and strength of schedule.
+
+## Simulated betting
+
+No endpoint here places a real wager.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/bet-slip/quote` | Price a slip: current odds, payout, EV, risk %, and any `problems` |
+| POST | `/bet-slip` | Place the slip. `409` when a price moved (resend the new `american`, or set `acceptOddsChanges`) or a market closed |
+| GET | `/open-bets` | Open simulated wagers with legs, plus bankroll exposure |
+| POST | `/open-bets/grade` | Grade your open wagers now (also runs on a schedule) |
+| POST | `/open-bets/:id/void` | Cancel before the first game starts; the stake is refunded |
+| POST | `/open-bets/:id/settle` | `{ "result": "won" \| "lost" \| "push" }` for futures and wagers the grader could not match |
+| GET | `/bankroll/history?limit=` | Bankroll overview, transaction ledger and daily bankroll curve |
+| GET | `/sim/bets?status=&sport=&limit=` | Simulated wager history |
+| GET | `/sim/analytics` | ROI by sport, conference, bet type and sportsbook, NCAA splits, CLV, EV and the profit curve |
+
+Slip body: `{ "mode": "single" | "parlay", "stake": 10, "legs": [{ "kind": "market", "sport": "ncaab", "gameId": "...", "selectionId": "...", "book": "draftkings", "american": -110, "stake": 25 }] }`. `selectionId` and `gameId` come from `/odds` selections. Singles carry `stake` per leg; a parlay uses the top-level `stake`. Futures legs are `{ "kind": "future", "marketId": "...", "outcome": "Duke", "american": 450, "stake": 10 }` and must be singles.
+
 ## Live game tracker
 
 All routes require authentication. `league` is `nba` (default), `nfl`, `mlb` or `nhl`.

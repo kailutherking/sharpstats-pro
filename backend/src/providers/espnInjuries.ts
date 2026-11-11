@@ -8,7 +8,7 @@ import { StatsProviderError, type League } from "./espnStats";
 const SITE_API = (process.env.ESPN_SITE_API_URL ?? "https://site.api.espn.com").replace(/\/+$/, "");
 const WEB_API = (process.env.ESPN_WEB_API_URL ?? "https://site.web.api.espn.com").replace(/\/+$/, "");
 const TIMEOUT_MS = Number(process.env.STATS_PROVIDER_TIMEOUT_MS ?? 20000);
-const PATHS: Record<League, string> = { nba: "basketball/nba", nfl: "football/nfl", mlb: "baseball/mlb", nhl: "hockey/nhl" };
+const PATHS: Record<League, string> = { nba: "basketball/nba", nfl: "football/nfl", mlb: "baseball/mlb", nhl: "hockey/nhl", ncaab: "basketball/mens-college-basketball" };
 
 async function fetchJson<T>(url: string): Promise<T> {
   let response: Response;

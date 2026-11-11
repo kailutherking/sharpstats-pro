@@ -90,6 +90,10 @@ Copy `.env.example` to `.env`. Secrets stay in `.env`, which git ignores; never 
 | `LIVE_PROVIDER_TIMEOUT_MS` | `12000` | Live game provider request timeout |
 | `INJURY_REFRESH_MINUTES` | `5` | Injury report refresh interval (also the background sync that raises injury alerts) |
 | `NHL_API_URL` | `https://api-web.nhle.com` | NHL official API (power-play situations) |
+| `NCAA_API_URL` | `https://ncaa-api.henrygd.me` | NCAA.com JSON mirror used for NET rankings |
+| `ESPN_CORE_API_URL` | `https://sports.core.api.espn.com` | NCAA futures and closing lines (ATS records) |
+| `KENPOM_API_KEY` / `KENPOM_API_URL` | empty / `https://kenpom.com/api.php` | Optional KenPom ratings (paid KenPom API) |
+| `SIM_GRADING_MINUTES` / `SIM_AUTO_GRADING` | `5` / `true` | Automatic grading of simulated wagers |
 | `VITE_API_URL` | current host | Frontend API base URL (build time) |
 
 ## Development workflow
@@ -112,7 +116,9 @@ All routes are prefixed with `/api`. Except for auth and health, requests requir
 - Odds platform: `GET /odds`, `/odds/live`, `/odds/movement`, `/odds/arbitrage`, `/odds/ev`, `/odds/props` (alias `/odds/player-props`), `/odds/sportsbooks`, `/odds/history`, `/odds/game/:id`, `/odds/search`, `/odds/clv`, `/odds/status`, `/odds/stream` (Server-Sent Events), `POST /odds/refresh`, `GET|POST|PATCH|DELETE /odds/alerts/rules`, `GET /odds/alerts`, `GET|PUT /odds/favorites` (full table in [docs/API.md](./docs/API.md))
 - `POST /bets/grade` (moneyline, spread, and total scores when supported provider results are available)
 - `GET|PUT /profile`
-- `GET /stats/:league` (`nba`, `nfl`, `mlb`, `nhl`), `POST /stats/:league/refresh`, `GET /stats/player/:id`, `GET /stats/team/:id`, `GET|PUT /stats/favorites`
+- `GET /stats/:league` (`nba`, `nfl`, `mlb`, `nhl`, `ncaab`), `POST /stats/:league/refresh`, `GET /stats/player/:id`, `GET /stats/team/:id`, `GET|PUT /stats/favorites`
+- NCAA men's basketball: `GET /ncaa/stats`, `/ncaa/players`, `/ncaa/teams`, `/ncaa/rankings`, `/ncaa/conferences`, `/ncaa/live-games`, `/ncaa/futures`
+- Simulated betting (no real money): `POST /bet-slip`, `POST /bet-slip/quote`, `GET /open-bets`, `POST /open-bets/grade`, `POST /open-bets/:id/void`, `POST /open-bets/:id/settle`, `GET /bankroll/history`, `GET /sim/bets`, `GET /sim/analytics`
 - Live games: `GET /live-games`, `GET /live-games/:id`, `GET /live-games/player/:id`
 - Injuries: `GET /injuries`, `GET /injuries/player/:id`, `GET /injuries/team/:id`, `GET /injuries/impact`
 - Community: `GET|PUT /social/me`, `/social/profiles/:handle`, `PUT /social/follows/:handle`, `/social/feed`, `/social/picks`, `/social/posts/:id` (reactions, comments), `/social/leaderboards`, `/social/achievements`
@@ -123,6 +129,14 @@ The Market Lab normalizes The Odds API prices across books, calculates no-vig co
 The personal odds-calibration model is a regularized logistic regression trained on a user's settled bet outcomes and odds. It remains disabled until there are at least 50 settled decisions; it calibrates odds, not player statistics or independent game features. Consensus probabilities require paired outcomes from multiple books. Score-based grading supports moneyline, spread, and totals when a matching completed event is returned by The Odds API; player props and unmatched events remain pending for manual grading. Kelly stake suggestions are fractional and portfolio-capped, not guarantees.
 
 ## Notes
+
+### Simulated betting
+
+The bet slip never places a real wager and never contacts a sportsbook. A slip is priced on the server from the live odds board, its stake is reserved against the simulated bankroll (`available = current bankroll - open exposure`), and the wager is graded from ESPN final scores. Each wager is also written to `bets` with `source = 'simulated'`, which is how the tracker, analytics, Sharp Insights, CLV and community picks include it.
+
+### NCAA data sources
+
+ESPN public feeds (teams, players, standings, polls, scores, DraftKings futures and closing lines), an NCAA.com JSON mirror for NET rankings, The Odds API for multi-book college odds (`basketball_ncaab`), and optionally the KenPom API. These feeds are unofficial for third-party use: review their terms before deploying commercially.
 
 - The demo account is deliberately local-only sample data. Replace the demo credentials and use a managed secret store for deployed environments.
 - Access JWTs are held in browser local storage; rotating refresh tokens are hash-stored in PostgreSQL and delivered through HTTP-only, same-site cookies. For a public deployment, use TLS, review the browser token threat model, and add operational monitoring.

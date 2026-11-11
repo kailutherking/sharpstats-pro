@@ -69,7 +69,7 @@ function grade(bet: PendingBet, event: ScoredEvent): PendingBet["result"] | null
 export async function gradePendingBets(userId: number) {
   const pending = await pool.query<PendingBet>(
     `SELECT id, user_id, sport, event, event_id, market_key, selection, team_player, line_value, result
-     FROM bets WHERE user_id=$1 AND result='pending' ORDER BY bet_date LIMIT 500`,
+     FROM bets WHERE user_id=$1 AND result='pending' AND source <> 'simulated' ORDER BY bet_date LIMIT 500`,
     [userId],
   );
   const sports = [...new Set(pending.rows.map((bet) => bet.sport.toLowerCase()))];
@@ -83,9 +83,11 @@ export async function gradePendingBets(userId: number) {
       : sport === "nfl" || sport.includes("football") ? "americanfootball_nfl"
       : sport === "mlb" || sport.includes("baseball") ? "baseball_mlb"
       : sport === "nhl" || sport.includes("hockey") ? "icehockey_nhl" : null;
-    if (!key) continue;
+    // College basketball is matched before the generic "basketball" (NBA) rule.
+    const resolved = /ncaa|college/.test(sport) ? "basketball_ncaab" : key;
+    if (!resolved) continue;
     try {
-      for (const event of await getOddsApiScores(key)) scores.set(event.id, event);
+      for (const event of await getOddsApiScores(resolved)) scores.set(event.id, event);
     } catch (error) {
       failures.push(error instanceof Error ? error.message : `Could not fetch ${sport} scores`);
     }

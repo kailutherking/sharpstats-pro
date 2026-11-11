@@ -20,7 +20,7 @@ const NOTIFICATION_LABELS: Array<[NotificationType, string, string]> = [
   ["streak", "Streaks", "Daily streak milestones"],
   ["achievement", "Badges", "New badges and level-ups"],
 ];
-const SPORTS: League[] = ["nba", "nfl", "mlb", "nhl"];
+const SPORTS: League[] = ["nba", "nfl", "mlb", "nhl", "ncaab"];
 
 /** Public profile (handle, bio, favorite sports, visibility) and notification switches. */
 export function SocialSettings() {

@@ -27,3 +27,7 @@ export const ShoppingBag = Icon;
 export const Split = Icon;
 export const Target = Icon;
 export const Users = Icon;
+export const ReceiptText = Icon;
+export const Trash2 = Icon;
+export const Plus = Icon;
+export const LineChart = Icon;

@@ -37,7 +37,7 @@ const lower = (query: Record<string, unknown>) => ({ ...query, league: typeof qu
 export async function injuryReport(req: AuthRequest, res: Response, next: NextFunction) {
   const query = reportQuery.safeParse(lower(req.query));
   if (!query.success) {
-    res.status(400).json({ error: "Invalid filters. Use league=nba|nfl|mlb|nhl." });
+    res.status(400).json({ error: "Invalid filters. Use league=nba|nfl|mlb|nhl|ncaab." });
     return;
   }
   const { league, refresh, ...filters } = query.data;

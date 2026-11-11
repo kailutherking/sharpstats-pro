@@ -13,6 +13,7 @@ import type {
   OddsBoard, OddsFavorite, OddsSport, PropsData, SearchResult, SportsbookRow,
 } from "./oddsTypes";
 import type { LiveGameDetail, LiveGamesResponse, LivePlayer } from "./liveTypes";
+import type { BankrollHistory, BankrollOverview, ConferenceStanding, GradeResult, NcaaFutures, NcaaRankings, NcaaStats, SimAnalytics, SlipQuote, SlipRequest, Wager } from "./simTypes";
 import type { InjuryImpactList, InjuryQuery, InjuryReport, PlayerInjuryProfile, TeamInjuries } from "./injuryTypes";
 import type { Achievements, AppNotification, BookRow, ChatMessage, CommentView, FeedFilter, FeedItem, GameChat, LeaderboardData, LeaderMetric, LeaderPeriod, LiveBet, LiveReaction, MyProfile, NotificationType, PostView, ProfileSummary, PublicProfile, Reaction, Visibility } from "./socialTypes";
 
@@ -153,6 +154,21 @@ export const api = {
   createBet: (bet: Partial<Bet>) => request<{ bet: Bet }>("/bets", { method: "POST", body: JSON.stringify(bet) }),
   updateBet: (id: number, patch: Partial<Bet>) => request<{ bet: Bet }>(`/bets/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteBet: (id: number) => request<void>(`/bets/${id}`, { method: "DELETE" }),
+  // Simulated betting (no real-money wagers).
+  quoteSlip: (slip: SlipRequest) => request<SlipQuote>("/bet-slip/quote", { method: "POST", body: JSON.stringify(slip) }),
+  placeSlip: (slip: SlipRequest) => request<{ slipId: string; wagerIds: string[]; quote: SlipQuote; bankroll: BankrollOverview }>("/bet-slip", { method: "POST", body: JSON.stringify(slip) }),
+  openBets: () => request<{ wagers: Wager[]; bankroll: BankrollOverview }>("/open-bets"),
+  gradeOpenBets: () => request<GradeResult>("/open-bets/grade", { method: "POST" }),
+  voidWager: (id: string) => request<{ bankroll: BankrollOverview }>(`/open-bets/${id}/void`, { method: "POST" }),
+  settleWager: (id: string, result: "won" | "lost" | "push") => request<{ bankroll: BankrollOverview }>(`/open-bets/${id}/settle`, { method: "POST", body: JSON.stringify({ result }) }),
+  simBets: (status: "settled" | "open" = "settled") => request<{ wagers: Wager[] }>(`/sim/bets${query({ status, limit: 100 })}`),
+  simAnalytics: () => request<SimAnalytics>("/sim/analytics"),
+  bankrollHistory: () => request<BankrollHistory>("/bankroll/history"),
+  // NCAA Division I men's basketball.
+  ncaaRankings: () => request<NcaaRankings>("/ncaa/rankings"),
+  ncaaStats: (conference?: string) => request<NcaaStats>(`/ncaa/stats${query({ conference })}`),
+  ncaaConferences: (conference?: string) => request<{ conferences: ConferenceStanding[] }>(`/ncaa/conferences${query({ conference })}`),
+  ncaaFutures: () => request<NcaaFutures>("/ncaa/futures"),
   summary: () => request<Summary>("/analytics/summary"),
   performance: () => request<Performance>("/analytics/performance"),
   bankroll: () => request<{ bankroll: Bankroll }>("/bankroll"),

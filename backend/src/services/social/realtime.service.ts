@@ -19,7 +19,7 @@ function write(res: Response, event: string, data: unknown): void {
 
 /** Topic names: `game:<league>:<eventId>`. */
 export const gameTopic = (league: string, eventId: string) => `game:${league}:${eventId}`;
-export const TOPIC_PATTERN = /^game:(nba|nfl|mlb|nhl):\d{1,14}$/;
+export const TOPIC_PATTERN = /^game:(nba|nfl|mlb|nhl|ncaab):\d{1,14}$/;
 
 export function openRealtime(res: Response, userId: number, topic: string | null): void {
   const mine = [...clients].filter((client) => client.userId === userId);

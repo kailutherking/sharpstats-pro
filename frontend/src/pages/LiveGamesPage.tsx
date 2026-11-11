@@ -17,12 +17,12 @@ import { LiveGameChat, PlayReactions } from "../components/live/LiveGameChat";
 import { useNavStore } from "../lib/navStore";
 
 const REFRESH_MS = 15_000;
-const PERIOD_NAMES: Record<League, string> = { nba: "Q", nfl: "Q", mlb: "", nhl: "P" };
+const PERIOD_NAMES: Record<League, string> = { nba: "Q", nfl: "Q", mlb: "", nhl: "P", ncaab: "H" };
 
 function Linescore({ game }: { game: LiveGame }) {
   const periods = Math.max(game.away.linescores.length, game.home.linescores.length);
   if (!periods) return null;
-  const regulation = game.league === "mlb" ? 9 : game.league === "nhl" ? 3 : 4;
+  const regulation = game.league === "mlb" ? 9 : game.league === "nhl" ? 3 : game.league === "ncaab" ? 2 : 4;
   const label = (index: number) => (game.league === "mlb" ? String(index + 1) : index < regulation ? `${PERIOD_NAMES[game.league]}${index + 1}` : index === regulation ? "OT" : `${index - regulation + 1}OT`);
   return (
     <div className="overflow-x-auto">

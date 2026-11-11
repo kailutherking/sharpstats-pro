@@ -95,6 +95,26 @@ export function TeamProfileView({ league, teamId, allTeams, isFavorite, onFavori
         {profile.unavailableMetrics.length > 0 && <p className="mt-3 text-[10px] text-[#69757a]">{profile.unavailableMetrics.join(" and ")} {profile.unavailableMetrics.length > 1 ? "are" : "is"} not published by the connected provider, so {profile.unavailableMetrics.length > 1 ? "they are" : "it is"} not shown.</p>}
       </Panel>
 
+      {profile.trends && (
+        <Panel title="Betting records" subtitle={profile.trends.note}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {[
+              ["Against the spread", profile.trends.ats.games ? profile.trends.ats.record : "—", "W-L-P"],
+              ["Over / under", profile.trends.overUnder.games ? profile.trends.overUnder.record : "—", "O-U-P"],
+              ["Last 5", profile.trends.last5.record, profile.trends.last5.form || "No games yet"],
+              ["Last 10", profile.trends.last10.record, profile.trends.last10.form || "No games yet"],
+              ["Strength of schedule", profile.trends.strengthOfSchedule.rank ? `#${profile.trends.strengthOfSchedule.rank}` : profile.trends.strengthOfSchedule.opponentWinPct === null ? "—" : `${(profile.trends.strengthOfSchedule.opponentWinPct * 100).toFixed(1)}%`, profile.trends.strengthOfSchedule.source],
+            ].map(([label, value, note]) => (
+              <div key={label} className="rounded-xl border border-line bg-[#0e1416] p-3">
+                <p className="text-[10px] text-muted">{label}</p>
+                <p className="mt-1.5 font-display text-lg font-bold">{value}</p>
+                <p className="mt-1 text-[10px] leading-snug text-muted">{note}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.9fr)]">
         <Panel title="Scoring trend" subtitle={`${profile.pointsLabel} scored and allowed, game by game`}>
           <TeamScoringChart data={chartData} pointsLabel={profile.pointsLabel} />
