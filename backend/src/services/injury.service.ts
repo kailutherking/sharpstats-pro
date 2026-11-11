@@ -409,7 +409,7 @@ export async function getInjuryImpact(league: League, options: { minImportance?:
 
 /** Keeps injury reports (and their status-change alerts) current even when nobody has the page open. */
 export function startInjuryScheduler(): () => void {
-  const leagues: League[] = ["nba", "nfl", "mlb", "nhl"];
+  const leagues: League[] = ["nba", "nfl", "mlb", "nhl", "ncaab"];
   const run = () => {
     for (const league of leagues) void leagueData(league, true).catch((error: unknown) => console.warn("Injury refresh failed", league, error instanceof Error ? error.message : error));
   };

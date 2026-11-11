@@ -6,12 +6,12 @@
  * DraftKings opening/closing lines for the NBA, NFL, MLB and NHL. The NHL's official API
  * (api-web.nhle.com) supplies power-play strength, which ESPN does not publish. Neither needs a key.
  */
-import { toNumber, StatsProviderError, type League } from "./espnStats";
+import { leaguePath, NCAAB_SCOREBOARD_PARAMS, toNumber, StatsProviderError, type League } from "./espnStats";
 
 const SITE_API = (process.env.ESPN_SITE_API_URL ?? "https://site.api.espn.com").replace(/\/+$/, "");
 const NHL_API = (process.env.NHL_API_URL ?? "https://api-web.nhle.com").replace(/\/+$/, "");
 const TIMEOUT_MS = Number(process.env.LIVE_PROVIDER_TIMEOUT_MS ?? 12000);
-const PATHS: Record<League, string> = { nba: "basketball/nba", nfl: "football/nfl", mlb: "baseball/mlb", nhl: "hockey/nhl" };
+const PATHS: Record<League, string> = { nba: leaguePath("nba"), nfl: leaguePath("nfl"), mlb: leaguePath("mlb"), nhl: leaguePath("nhl"), ncaab: leaguePath("ncaab") };
 
 async function fetchJson<T>(url: string): Promise<T> {
   let response: Response;
@@ -151,8 +151,8 @@ export function periodLabel(league: League, period: number, detail: string): str
     const prefix = half === "top" ? "Top" : half === "bot" || half === "bottom" ? "Bot" : half === "mid" || half === "middle" ? "Mid" : half === "end" ? "End" : "";
     return `${prefix ? `${prefix} ` : ""}${ordinal(period)}`;
   }
-  const regulation = league === "nhl" ? 3 : 4;
-  if (period <= regulation) return league === "nhl" ? `P${period}` : `Q${period}`;
+  const regulation = league === "nhl" ? 3 : league === "ncaab" ? 2 : 4;
+  if (period <= regulation) return league === "nhl" ? `P${period}` : league === "ncaab" ? `${period}H` : `Q${period}`;
   if (league === "nhl" && /shootout/i.test(detail)) return "SO";
   return period === regulation + 1 ? "OT" : `${period - regulation}OT`;
 }
@@ -315,12 +315,25 @@ function easternDate(offsetDays = 0): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(date).replace(/-/g, "");
 }
 
+/** US Eastern calendar date (YYYYMMDD) of an instant: the key ESPN's scoreboard is organized by. */
+export function easternDateOf(instant: Date | string | number): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(instant)).replace(/-/g, "");
+}
+
+/** Every game on one US Eastern date (YYYYMMDD), used to grade wagers after the fact. */
+export async function fetchScoreboardForDate(league: League, date: string): Promise<ProviderLiveGame[]> {
+  const extra = league === "ncaab" ? `&${NCAAB_SCOREBOARD_PARAMS}` : "";
+  const payload = await fetchJson<{ events?: Json[] }>(`${SITE_API}/apis/site/v2/sports/${PATHS[league]}/scoreboard?dates=${date}${extra}`);
+  return arr(payload.events).map(obj).map((event) => normalizeEvent(league, event)).filter((game): game is ProviderLiveGame => game !== null);
+}
+
 /** Today's slate (US Eastern), plus games from yesterday that are still in progress past midnight. */
 export async function fetchLiveScoreboard(league: League): Promise<ProviderLiveGame[]> {
   // NFL's default scoreboard is the current week; the other leagues use today's date (US Eastern).
+  const extra = league === "ncaab" ? `&${NCAAB_SCOREBOARD_PARAMS}` : "";
   const [today, yesterday] = await Promise.all([
-    fetchJson<{ events?: Json[] }>(`${SITE_API}/apis/site/v2/sports/${PATHS[league]}/scoreboard${league === "nfl" ? "" : `?dates=${easternDate(0)}`}`),
-    fetchJson<{ events?: Json[] }>(`${SITE_API}/apis/site/v2/sports/${PATHS[league]}/scoreboard?dates=${easternDate(-1)}`).catch(() => ({ events: [] as Json[] })),
+    fetchJson<{ events?: Json[] }>(`${SITE_API}/apis/site/v2/sports/${PATHS[league]}/scoreboard${league === "nfl" ? "" : `?dates=${easternDate(0)}${extra}`}`),
+    fetchJson<{ events?: Json[] }>(`${SITE_API}/apis/site/v2/sports/${PATHS[league]}/scoreboard?dates=${easternDate(-1)}${extra}`).catch(() => ({ events: [] as Json[] })),
   ]);
   const games = new Map<string, ProviderLiveGame>();
   for (const event of arr(yesterday.events).map(obj)) {
@@ -401,7 +414,7 @@ function parseBox(league: League, raw: unknown): BoxTeam[] {
     const teamId = str(obj(team.team).id) ?? "";
     const groups = arr(team.statistics).map(obj).map((group, index): BoxGroup => {
       const keys = arr(group.keys).map((key) => str(key) ?? "");
-      const name = str(group.name) ?? (league === "mlb" ? (keys.includes("fullInnings.partInnings") ? "pitching" : "batting") : league === "nba" ? "players" : `group${index}`);
+      const name = str(group.name) ?? (league === "mlb" ? (keys.includes("fullInnings.partInnings") ? "pitching" : "batting") : league === "nba" || league === "ncaab" ? "players" : `group${index}`);
       const labels = arr(group.labels).map((label) => str(label) ?? "");
       const players = arr(group.athletes).map(obj).map((row): BoxPlayer | null => {
         const athlete = obj(row.athlete);

@@ -32,3 +32,24 @@ export function PerformanceChart({ performance, period }: { performance: Perform
     </div>
   );
 }
+
+/** A single-series curve in the same style as the performance chart (profit curve, bankroll curve). */
+export function CurveChart({ points, name, empty, signed = false, id }: { points: Array<{ label: string; value: number }>; name: string; empty: string; signed?: boolean; id: string }) {
+  const dollars = (value: number) => `${value < 0 ? "-" : signed && value > 0 ? "+" : ""}${money(value)}`;
+  return (
+    <div className="h-[230px] w-full">
+      {points.length ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={points} margin={{ top: 10, right: 4, left: -8, bottom: 0 }}>
+            <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#c5f467" stopOpacity={0.22} /><stop offset="100%" stopColor="#c5f467" stopOpacity={0} /></linearGradient></defs>
+            <CartesianGrid strokeDasharray="3 5" vertical={false} />
+            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#849198", fontSize: 11 }} dy={10} minTickGap={24} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: "#849198", fontSize: 11 }} tickFormatter={dollars} domain={signed ? ["auto", "auto"] : ["dataMin", "dataMax"]} />
+            <Tooltip contentStyle={{ background: "#11171b", border: "1px solid #29343a", borderRadius: 12, color: "#eef2ed" }} formatter={(value: number) => [dollars(value), name]} labelStyle={{ color: "#a9b5b4" }} />
+            <Area type="monotone" dataKey="value" stroke="#c5f467" strokeWidth={2.5} fill={`url(#${id})`} activeDot={{ r: 4, fill: "#c5f467", stroke: "#11171b", strokeWidth: 2 }} />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted">{empty}</div>}
+    </div>
+  );
+}

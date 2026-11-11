@@ -1,4 +1,4 @@
-export type OddsSport = "nba" | "nfl" | "mlb" | "nhl";
+export type OddsSport = "nba" | "nfl" | "mlb" | "nhl" | "ncaab";
 export type MarketCategory = "game" | "period" | "team" | "alternate" | "prop";
 export type MarketType = "moneyline" | "spread" | "total" | "team_total" | "prop_ou" | "prop_yes";
 export type EvTier = "positive" | "strong" | "elite";

@@ -1,3 +1,4 @@
+import { NcaaHub } from "../components/ncaa/NcaaHub";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Clock3, Download, RefreshCw, X } from "lucide-react";
@@ -21,12 +22,12 @@ type Tab = "leaders" | "players" | "teams" | "compare" | "live";
 type View = { kind: "hub" } | { kind: "player"; id: string } | { kind: "team"; id: string };
 const LEAGUE_KEY = "sharpstats_stats_league";
 const REFRESH_MS = 15 * 60 * 1000;
-const emptyCompare = () => ({ nba: { players: [], teams: [] }, nfl: { players: [], teams: [] }, mlb: { players: [], teams: [] }, nhl: { players: [], teams: [] } }) as Record<League, { players: string[]; teams: string[] }>;
+const emptyCompare = () => ({ nba: { players: [], teams: [] }, nfl: { players: [], teams: [] }, mlb: { players: [], teams: [] }, nhl: { players: [], teams: [] }, ncaab: { players: [], teams: [] } }) as Record<League, { players: string[]; teams: string[] }>;
 
 function storedLeague(): League {
   try {
     const value = localStorage.getItem(LEAGUE_KEY);
-    return value === "nba" || value === "nfl" || value === "mlb" || value === "nhl" ? value : "nba";
+    return value === "nba" || value === "nfl" || value === "mlb" || value === "nhl" || value === "ncaab" ? value : "nba";
   } catch {
     return "nba";
   }
@@ -219,6 +220,7 @@ export function StatsPage() {
 
   const notices = (
     <>
+      {league === "ncaab" && view.kind === "hub" && tab !== "live" && <NcaaHub onTeam={(id) => open({ kind: "team", id })} />}
       {message && <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-line bg-panel px-4 py-3 text-xs text-muted">{message}<button type="button" onClick={() => setMessage("")} aria-label="Dismiss"><X size={14} /></button></div>}
       {statsQuery.error && !data && <div className="mb-4 rounded-xl border border-rose-900/60 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">{statsQuery.error instanceof Error ? statsQuery.error.message : "Stats are unavailable"} <button type="button" onClick={() => void statsQuery.refetch()} className="ml-2 underline">Retry</button></div>}
       {data?.stale && <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-900/50 bg-amber-950/20 px-4 py-3 text-xs text-amber-200"><AlertTriangle size={14} />The stats provider did not respond. Showing the last saved data from {formatUpdated(data.fetchedAt)}.</div>}

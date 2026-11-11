@@ -27,28 +27,29 @@ model User {
 }
 
 model Bet {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @map("user_id")
-  sport      String    @db.VarChar(60)
-  league     String    @default("") @db.VarChar(80)
-  event      String    @db.VarChar(180)
-  betType    String    @default("Moneyline") @map("bet_type") @db.VarChar(80)
-  teamPlayer String    @default("") @map("team_player") @db.VarChar(120)
-  odds       Decimal   @db.Decimal(10, 3)
-  stake      Decimal   @db.Decimal(12, 2)
-  result     String    @default("pending") @db.VarChar(10)
-  profitLoss Decimal   @default(0) @map("profit_loss") @db.Decimal(12, 2)
-  sportsbook String    @db.VarChar(80)
-  betDate    DateTime  @default(now()) @map("bet_date") @db.Timestamptz
-  closingOdds Decimal? @map("closing_odds") @db.Decimal(10, 3)
-  marketKey  String    @default("h2h") @map("market_key") @db.VarChar(80)
-  selection  String    @default("") @db.VarChar(180)
-  lineValue  Decimal?  @map("line_value") @db.Decimal(10, 3)
-  eventId    String?   @map("event_id") @db.VarChar(100)
-  gradedAt   DateTime? @map("graded_at") @db.Timestamptz
-  notes      String    @default("")
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  sport       String    @db.VarChar(60)
+  league      String    @default("") @db.VarChar(80)
+  event       String    @db.VarChar(180)
+  betType     String    @default("Moneyline") @map("bet_type") @db.VarChar(80)
+  teamPlayer  String    @default("") @map("team_player") @db.VarChar(120)
+  odds        Decimal   @db.Decimal(10, 3)
+  stake       Decimal   @db.Decimal(12, 2)
+  result      String    @default("pending") @db.VarChar(10)
+  profitLoss  Decimal   @default(0) @map("profit_loss") @db.Decimal(12, 2)
+  sportsbook  String    @db.VarChar(80)
+  betDate     DateTime  @default(now()) @map("bet_date") @db.Timestamptz
+  closingOdds Decimal?  @map("closing_odds") @db.Decimal(10, 3)
+  marketKey   String    @default("h2h") @map("market_key") @db.VarChar(80)
+  selection   String    @default("") @db.VarChar(180)
+  lineValue   Decimal?  @map("line_value") @db.Decimal(10, 3)
+  eventId     String?   @map("event_id") @db.VarChar(100)
+  gradedAt    DateTime? @map("graded_at") @db.Timestamptz
+  notes       String    @default("")
+  source      String    @default("manual") @db.VarChar(12)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, betDate(sort: Desc)])
   @@index([userId, result])
@@ -723,4 +724,184 @@ model LiveGameEvent {
 
   @@index([league, eventId, createdAt(sort: Desc)], map: "live_game_events_game_idx")
   @@map("live_game_events")
+}
+
+// NCAA Division I men's basketball reference data and simulated betting (migration 004).
+model NcaaConference {
+  conferenceId String   @id @map("conference_id") @db.VarChar(24)
+  name         String   @db.VarChar(120)
+  season       Int
+  teamCount    Int      @default(0) @map("team_count")
+  active       Boolean  @default(true)
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("ncaa_conferences")
+}
+
+model NcaaTeam {
+  teamId           String   @id @map("team_id") @db.VarChar(12)
+  name             String   @db.VarChar(120)
+  shortName        String   @default("") @map("short_name") @db.VarChar(80)
+  abbr             String   @default("") @db.VarChar(12)
+  logo             String?
+  conferenceId     String?  @map("conference_id") @db.VarChar(24)
+  conference       String   @default("") @db.VarChar(120)
+  season           Int
+  wins             Int      @default(0)
+  losses           Int      @default(0)
+  record           String   @default("") @db.VarChar(12)
+  homeRecord       String   @default("") @map("home_record") @db.VarChar(12)
+  awayRecord       String   @default("") @map("away_record") @db.VarChar(12)
+  conferenceRecord String   @default("") @map("conference_record") @db.VarChar(12)
+  streak           String   @default("") @db.VarChar(8)
+  active           Boolean  @default(true)
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@index([conferenceId])
+  @@map("ncaa_teams")
+}
+
+model NcaaPlayer {
+  athleteId String   @id @map("athlete_id") @db.VarChar(14)
+  name      String   @db.VarChar(120)
+  teamId    String   @default("") @map("team_id") @db.VarChar(12)
+  position  String   @default("") @db.VarChar(8)
+  headshot  String?
+  season    Int
+  active    Boolean  @default(true)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@index([teamId])
+  @@map("ncaa_players")
+}
+
+model NcaaRanking {
+  season          Int
+  poll            String   @db.VarChar(10)
+  release         String   @db.VarChar(60)
+  teamName        String   @map("team_name") @db.VarChar(120)
+  teamId          String?  @map("team_id") @db.VarChar(12)
+  rank            Int
+  previousRank    Int?     @map("previous_rank")
+  points          Decimal? @db.Decimal(10, 2)
+  firstPlaceVotes Int?     @map("first_place_votes")
+  record          String   @default("") @db.VarChar(12)
+  extra           Json     @default("{}")
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@id([season, poll, release, teamName])
+  @@index([teamId, poll])
+  @@map("ncaa_rankings")
+}
+
+model NcaaStatistic {
+  season     Int
+  entityType String   @map("entity_type") @db.VarChar(8)
+  entityId   String   @map("entity_id") @db.VarChar(14)
+  stats      Json
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@id([season, entityType, entityId])
+  @@map("ncaa_statistics")
+}
+
+model BetSlip {
+  id              BigInt         @id @default(autoincrement())
+  userId          Int            @map("user_id")
+  slipType        String         @map("slip_type") @db.VarChar(8)
+  wagerCount      Int            @map("wager_count")
+  legCount        Int            @map("leg_count")
+  totalStake      Decimal        @map("total_stake") @db.Decimal(12, 2)
+  potentialPayout Decimal        @map("potential_payout") @db.Decimal(14, 2)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  wagers          SimulatedBet[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("bet_slips")
+}
+
+// Open wagers are the rows with status "open" (also exposed as the open_wagers view).
+model SimulatedBet {
+  id                 BigInt                @id @default(autoincrement())
+  slipId             BigInt                @map("slip_id")
+  userId             Int                   @map("user_id")
+  betId              Int                   @unique @map("bet_id")
+  betType            String                @map("bet_type") @db.VarChar(16)
+  sport              String                @db.VarChar(12)
+  conference         String                @default("") @db.VarChar(120)
+  sportsbook         String                @db.VarChar(80)
+  bookKey            String                @map("book_key") @db.VarChar(40)
+  description        String                @db.VarChar(400)
+  stake              Decimal               @db.Decimal(12, 2)
+  oddsDecimal        Decimal               @map("odds_decimal") @db.Decimal(12, 4)
+  oddsAmerican       Int                   @map("odds_american")
+  potentialPayout    Decimal               @map("potential_payout") @db.Decimal(14, 2)
+  status             String                @default("open") @db.VarChar(8)
+  payout             Decimal               @default(0) @db.Decimal(14, 2)
+  profitLoss         Decimal               @default(0) @map("profit_loss") @db.Decimal(14, 2)
+  units              Decimal               @default(0) @db.Decimal(10, 4)
+  riskPct            Decimal               @default(0) @map("risk_pct") @db.Decimal(8, 4)
+  bankrollBefore     Decimal               @default(0) @map("bankroll_before") @db.Decimal(12, 2)
+  fairProbability    Decimal?              @map("fair_probability") @db.Decimal(8, 5)
+  evPct              Decimal?              @map("ev_pct") @db.Decimal(9, 3)
+  closingOddsDecimal Decimal?              @map("closing_odds_decimal") @db.Decimal(12, 4)
+  clvPct             Decimal?              @map("clv_pct") @db.Decimal(9, 3)
+  placedAt           DateTime              @default(now()) @map("placed_at") @db.Timestamptz
+  settledAt          DateTime?             @map("settled_at") @db.Timestamptz
+  slip               BetSlip               @relation(fields: [slipId], references: [id], onDelete: Cascade)
+  legs               SimulatedBetLeg[]
+  transactions       BankrollTransaction[]
+
+  @@index([userId, placedAt(sort: Desc)])
+  @@map("simulated_bets")
+}
+
+model SimulatedBetLeg {
+  id              BigInt       @id @default(autoincrement())
+  simBetId        BigInt       @map("sim_bet_id")
+  legIndex        Int          @default(0) @map("leg_index")
+  sport           String       @db.VarChar(12)
+  gameId          String       @map("game_id") @db.VarChar(100)
+  espnEventId     String?      @map("espn_event_id") @db.VarChar(20)
+  event           String       @db.VarChar(220)
+  homeTeam        String       @default("") @map("home_team") @db.VarChar(120)
+  awayTeam        String       @default("") @map("away_team") @db.VarChar(120)
+  commenceTime    DateTime?    @map("commence_time") @db.Timestamptz
+  marketKey       String       @map("market_key") @db.VarChar(60)
+  marketType      String       @map("market_type") @db.VarChar(12)
+  period          String       @default("game") @db.VarChar(6)
+  selection       String       @db.VarChar(180)
+  participant     String       @default("") @db.VarChar(180)
+  point           Decimal?     @db.Decimal(10, 2)
+  label           String       @db.VarChar(300)
+  conference      String       @default("") @db.VarChar(120)
+  bookKey         String       @map("book_key") @db.VarChar(40)
+  lineId          String?      @map("line_id")
+  oddsAmerican    Int          @map("odds_american")
+  oddsDecimal     Decimal      @map("odds_decimal") @db.Decimal(10, 4)
+  fairProbability Decimal?     @map("fair_probability") @db.Decimal(8, 5)
+  closingAmerican Int?         @map("closing_american")
+  status          String       @default("open") @db.VarChar(8)
+  resultValue     Decimal?     @map("result_value") @db.Decimal(10, 2)
+  resultNote      String       @default("") @map("result_note") @db.VarChar(200)
+  gradedAt        DateTime?    @map("graded_at") @db.Timestamptz
+  wager           SimulatedBet @relation(fields: [simBetId], references: [id], onDelete: Cascade)
+
+  @@index([simBetId])
+  @@map("simulated_bet_legs")
+}
+
+model BankrollTransaction {
+  id           BigInt        @id @default(autoincrement())
+  userId       Int           @map("user_id")
+  kind         String        @db.VarChar(12)
+  amount       Decimal       @db.Decimal(14, 2)
+  balanceAfter Decimal       @map("balance_after") @db.Decimal(14, 2)
+  simBetId     BigInt?       @map("sim_bet_id")
+  note         String        @default("") @db.VarChar(240)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  wager        SimulatedBet? @relation(fields: [simBetId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("bankroll_transactions")
 }

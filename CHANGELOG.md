@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-10
+
+### Added
+- **NCAA Division I men's basketball** (`ncaab`) as a league across Stats, Odds screen, Live games, Injury report, Market lab, Bet tracker and community settings. All 32 conferences and 365 programs come from the provider on every refresh, so a new season, realignment or a program moving to Division I needs no code change.
+- NCAA team stats: offensive, defensive and net rating, tempo/pace, effective FG%, turnover %, offensive and total rebounding %, free throw rate, plus home, away and conference records.
+- NCAA player stats: points, rebounds, assists, steals, blocks, minutes, FG%, 3P%, FT%, turnovers, PER, usage rate (derived), eFG% and TS%, with game logs, prop hit rates and Last 10 / Last 30 windows.
+- Rankings panel on Stats → NCAAB: AP Top 25, Coaches Poll and NET, plus KenPom ratings when `KENPOM_API_KEY` is set. Conference standings for every conference.
+- Team profiles for college teams show against-the-spread and over/under records (DraftKings closing lines), Last 5 / Last 10 form and strength of schedule.
+- NCAA odds markets: moneyline, spread, total, 1st-half and 2nd-half markets, team totals, alternates and player props, across DraftKings, FanDuel, BetMGM, Caesars, ESPN BET, Fanatics, PrizePicks and Underdog. NCAA futures (national champion, Final Four, conference regular-season winners) on the Odds screen.
+- Live tracker support for college games: halves, halftime, team stats, player leaders, win probability and live lines.
+- **Simulated betting.** A bet slip (Odds screen → slip button next to any price) places simulated singles, parlays, same game parlays and futures. Nothing is wagered for real. The server re-prices every leg from the live board, rejects stale or moved prices, and reserves the stake against the bankroll.
+- Simulated wagers are graded automatically from final scores every 5 minutes (`SIM_GRADING_MINUTES`), including half markets and basketball player props. Pushes and voided legs reduce a parlay; a wager can be cancelled for a refund until its first game starts.
+- Bankroll now shows available balance, open exposure, risk %, units at risk and open positions, with a transaction ledger and bankroll curve.
+- Simulation analytics on the Analytics page: profit curve, bankroll curve, ROI by sport, conference, bet type and sportsbook, NCAA splits, average CLV and average EV.
+- API: `GET /api/ncaa/stats`, `/ncaa/players`, `/ncaa/teams`, `/ncaa/rankings`, `/ncaa/conferences`, `/ncaa/live-games`, `/ncaa/futures`; `POST /api/bet-slip`, `POST /api/bet-slip/quote`; `GET /api/open-bets`, `POST /api/open-bets/grade`, `POST /api/open-bets/:id/void`, `POST /api/open-bets/:id/settle`; `GET /api/bankroll/history`; `GET /api/sim/bets`, `GET /api/sim/analytics`.
+- Migration `004_ncaa_sim_betting.sql`: `ncaa_conferences`, `ncaa_teams`, `ncaa_players`, `ncaa_rankings`, `ncaa_statistics`, `bet_slips`, `simulated_bets`, `simulated_bet_legs`, `bankroll_transactions`, the `open_wagers` view and `bets.source`.
+- Settings: `KENPOM_API_KEY`, `KENPOM_API_URL`, `NCAA_API_URL`, `ESPN_CORE_API_URL`, `SIM_GRADING_MINUTES`, `SIM_AUTO_GRADING`.
+
+### Changed
+- `GET /api/bankroll` also returns `simulation` (available, exposure, risk %, pending bets).
+- Simulated wagers appear in the Bet tracker with `source: "simulated"`. They can't be edited or deleted there (409); cancel or settle them under Simulated wagers.
+- `POST /api/bets/grade` skips simulated wagers (they have their own grader) and now grades manually logged college basketball bets.
+
+### Fixed
+- Player game logs were empty for leagues whose provider labels the regular season on the category instead of the season type (college basketball).
+
 ## [1.6.1] - 2026-11-09
 
 ### Fixed
@@ -152,7 +178,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Docker now serves the production frontend through Nginx and prunes development dependencies from the backend image.
 - Odds and analysis features are documented as quota-dependent, on-demand research rather than guaranteed predictions.
 
-[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/kailutherking/sharpstats-pro/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/kailutherking/sharpstats-pro/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kailutherking/sharpstats-pro/compare/v1.4.1...v1.5.0

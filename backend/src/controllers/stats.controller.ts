@@ -35,7 +35,7 @@ function handleError(error: unknown, res: Response, next: NextFunction) {
 function parseLeague(value: unknown, res: Response): League | null {
   const parsed = leagueSchema.safeParse(typeof value === "string" ? value.toLowerCase() : value);
   if (!parsed.success) {
-    res.status(404).json({ error: "Unsupported league. Use nba, nfl, mlb or nhl." });
+    res.status(404).json({ error: "Unsupported league. Use nba, nfl, mlb, nhl or ncaab." });
     return null;
   }
   return parsed.data;

@@ -22,6 +22,8 @@ export const STATUS_WEIGHT: Record<InjuryStatus, number> = {
 /** League scoring unit, the rating change treated as elite, and win probability per unit. */
 const SCALE: Record<League, { unit: string; elite: number; winPerUnit: number }> = {
   nba: { unit: "pts", elite: 6, winPerUnit: 0.028 },
+  // Fewer possessions and shorter games: one point of margin moves a college game slightly more.
+  ncaab: { unit: "pts", elite: 5, winPerUnit: 0.032 },
   nfl: { unit: "pts", elite: 4.5, winPerUnit: 0.03 },
   mlb: { unit: "runs", elite: 0.35, winPerUnit: 0.1 },
   nhl: { unit: "goals", elite: 0.3, winPerUnit: 0.2 },
@@ -67,7 +69,7 @@ export function playerValue(league: League, row: PlayerRow | null, position: str
     const offense = defaults[pos] ?? 0.1 * (SCALE[league].elite / 6);
     return { offense, defense: 0, basis: "No current-season statistics: position default applied." };
   }
-  if (league === "nba") {
+  if (league === "nba" || league === "ncaab") {
     const pts = val(row, "pts") ?? 0, reb = val(row, "reb") ?? 0, ast = val(row, "ast") ?? 0, stl = val(row, "stl") ?? 0, blk = val(row, "blk") ?? 0, tov = val(row, "tov") ?? 0;
     const total = pts + 1.2 * reb + 1.5 * ast + 2 * stl + 2 * blk - tov;
     const above = Math.max(0, total - 12) * 0.165;
@@ -128,7 +130,7 @@ export function playerValue(league: League, row: PlayerRow | null, position: str
 /** Fantasy points per game (common PPR/points scoring). */
 export function fantasyPerGame(league: League, row: PlayerRow | null, position: string): number | null {
   if (!row) return null;
-  if (league === "nba") return (val(row, "pts") ?? 0) + 1.2 * (val(row, "reb") ?? 0) + 1.5 * (val(row, "ast") ?? 0) + 3 * ((val(row, "stl") ?? 0) + (val(row, "blk") ?? 0)) - (val(row, "tov") ?? 0);
+  if (league === "nba" || league === "ncaab") return (val(row, "pts") ?? 0) + 1.2 * (val(row, "reb") ?? 0) + 1.5 * (val(row, "ast") ?? 0) + 3 * ((val(row, "stl") ?? 0) + (val(row, "blk") ?? 0)) - (val(row, "tov") ?? 0);
   if (league === "nfl") {
     const g = val(row, "gp") || 1;
     return ((val(row, "passYds") ?? 0) * 0.04 + (val(row, "passTd") ?? 0) * 4 - (val(row, "int") ?? 0) * 2 + ((val(row, "rushYds") ?? 0) + (val(row, "recYds") ?? 0)) * 0.1
@@ -153,6 +155,7 @@ export function fantasyPerGame(league: League, row: PlayerRow | null, position: 
 
 const PROP_MARKETS: Record<League, (position: string, row: PlayerRow | null) => string[]> = {
   nba: () => ["Points", "Rebounds", "Assists", "PRA", "3PT made"],
+  ncaab: () => ["Points", "Rebounds", "Assists", "PRA", "3PT made"],
   nfl: (position) => position === "QB" ? ["Passing yards", "Passing TDs", "Completions"] : position === "RB" ? ["Rushing yards", "Rush attempts", "Anytime TD"] : ["WR", "TE"].includes(position) ? ["Receiving yards", "Receptions", "Anytime TD"] : ["Tackles", "Sacks"],
   mlb: (_position, row) => (row && (row.values.pg ?? 0) > 0 && (row.values.ab ?? 0) < 20 ? ["Pitcher strikeouts", "Pitching outs", "Earned runs"] : ["Hits", "Total bases", "Home runs", "RBIs"]),
   nhl: (position) => position === "G" ? ["Saves", "Goals against"] : ["Points", "Shots on goal", "Goals", "Assists"],

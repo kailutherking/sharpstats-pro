@@ -26,6 +26,7 @@ export interface Bet {
   line_value?: number | string | null;
   event_id?: string | null;
   notes?: string;
+  source?: BetSource;
 }
 
 export interface Summary {
@@ -44,6 +45,9 @@ export interface Summary {
   win_rate: number;
   bankroll: { starting_bankroll: string; current_bankroll: string; unit_size: string };
 }
+
+/** "simulated" bets come from the bet slip and are graded automatically; "manual" bets are logged by hand. */
+export type BetSource = "manual" | "simulated";
 
 export interface Performance {
   bySport: GroupMetric[];

@@ -1,3 +1,5 @@
+import { NcaaFutures } from "../components/ncaa/NcaaHub";
+import { useBetSlip } from "../lib/betSlipStore";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Clock3, Download, RefreshCw, Star, Wifi, WifiOff, X } from "lucide-react";
@@ -28,14 +30,14 @@ const TABS: Array<{ value: Tab; label: string }> = [
   { value: "arbitrage", label: "Arbitrage" }, { value: "props", label: "Player props" }, { value: "movement", label: "Line movement" }, { value: "injuries", label: "Injury impact" },
   { value: "alerts", label: "Alerts" }, { value: "clv", label: "CLV tracker" },
 ];
-const SPORTS: Array<{ value: OddsSport; label: string }> = [{ value: "nba", label: "NBA" }, { value: "nfl", label: "NFL" }, { value: "mlb", label: "MLB" }, { value: "nhl", label: "NHL" }];
+const SPORTS: Array<{ value: OddsSport; label: string }> = [{ value: "nba", label: "NBA" }, { value: "nfl", label: "NFL" }, { value: "mlb", label: "MLB" }, { value: "nhl", label: "NHL" }, { value: "ncaab", label: "NCAAB" }];
 const SPORT_KEY = "sharpstats_odds_sport";
 const POLL_MS = 30_000;
 
 function storedSport(): OddsSport {
   try {
     const value = localStorage.getItem(SPORT_KEY);
-    return value === "nba" || value === "nfl" || value === "mlb" || value === "nhl" ? value : "nba";
+    return value === "nba" || value === "nfl" || value === "mlb" || value === "nhl" || value === "ncaab" ? value : "nba";
   } catch {
     return "nba";
   }
@@ -170,6 +172,16 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
       tier: null, risk: null, confidence: null, arbitrage: null, signals: { steam: false, sharp: false, reverse: false, moves: 0, lastMoveAt: null }, updatedAt: "",
     });
   }, [data, sport]);
+
+  const addToSlip = useBetSlip((state) => state.add);
+  function slip(selection: Selection, price: BookPrice) {
+    const subject = selection.participant ? `${selection.participant} ${selection.selection}` : selection.selection;
+    const line = price.point === null ? "" : selection.type === "spread" ? ` ${price.point > 0 ? "+" : ""}${price.point === 0 ? "PK" : price.point}` : ` ${price.point}`;
+    addToSlip({
+      key: selection.id, kind: "market", sport, gameId: selection.gameId, selectionId: selection.id, book: price.book, american: price.american,
+      label: `${subject}${line} · ${selection.marketLabel}`, event: games.get(selection.gameId)?.label ?? "", bookName: bookName(books, price.book),
+    });
+  }
 
   function track(selection: Selection, price: BookPrice) {
     const game = games.get(selection.gameId);
@@ -314,7 +326,8 @@ export function OddsPage({ onLog }: { onLog: (draft: Partial<Bet>) => void }) {
         <>
           <OddsDashboard metrics={data.metrics} books={books} onOpen={(next) => setTab(next)} />
           <div className="mb-4 overflow-x-auto"><Segmented label="Odds views" value={tab} onChange={setTab} options={TABS.map((item) => item.value === "alerts" && alerts.data?.alerts.length ? { ...item, label: `Alerts (${alerts.data.alerts.length})` } : item)} /></div>
-          {tab === "board" && <MarketBoard selections={data.selections} games={games} books={books} sizing={data.sizing} bookFilter={filters.book} onHistory={setHistoryFor} onTrack={track} onGame={setGameFor} />}
+          {tab === "board" && sport === "ncaab" && <div className="mb-4"><NcaaFutures /></div>}
+          {tab === "board" && <MarketBoard selections={data.selections} games={games} books={books} sizing={data.sizing} bookFilter={filters.book} onHistory={setHistoryFor} onTrack={track} onSlip={slip} onGame={setGameFor} />}
           {tab === "shop" && <BookComparison selections={data.selections} games={games} books={books} sportsbooks={sportsbooks.data?.sportsbooks} onToggleFavoriteBook={(book) => void toggleFavoriteBook(book)} onHistory={setHistoryFor} onGame={setGameFor} />}
           {tab === "ev" && <EvScanner data={ev.data?.sport === sport ? ev.data : undefined} books={books} loading={ev.isLoading} keyless={keyless} onOpen={openSelection} />}
           {tab === "arbitrage" && <ArbitrageScanner data={arbitrage.data?.sport === sport ? arbitrage.data : undefined} books={books} loading={arbitrage.isLoading} keyless={keyless} total={arbTotal} onTotal={setArbTotal} onOpen={openSelection} />}

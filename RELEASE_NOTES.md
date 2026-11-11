@@ -1,5 +1,37 @@
 # Release notes
 
+## SharpStats Pro 1.7.0
+
+**Version:** 1.7.0
+**Release date:** 2026-11-10
+
+### Features added
+- **NCAA Division I men's basketball** everywhere a league can be picked: Stats, Odds screen, Live games, Injury report, Market lab and the Bet tracker. All 32 conferences and 365 programs, refreshed from the provider each season.
+- **College stats:** team efficiency (offensive/defensive/net rating, tempo, eFG%, turnover %, rebounding %, free throw rate), player stats with PER and usage rate, game logs, AP / Coaches / NET rankings, conference standings, and ATS and over/under records on team pages. KenPom ratings appear when you add a KenPom API key.
+- **College odds:** moneyline, spread, total, half markets, team totals, player props and futures (national title, Final Four, conference winners).
+- **Simulated betting:** build a bet slip from the Odds screen, pick the sportsbook, enter a stake, review the payout and submit. Singles, parlays, same game parlays and futures. Stakes come out of your simulated bankroll and wagers are graded automatically. No real money is involved.
+- **Bankroll:** available balance, exposure, risk %, open positions, a transaction ledger and a bankroll curve.
+- **Analytics:** profit and bankroll curves, ROI by sport, conference, bet type and sportsbook, CLV and EV for simulated wagers.
+
+### Bug fixes
+- Player game logs now load for college players (the provider labels its regular season differently there).
+
+### Performance improvements
+- Placing a moneyline, spread or total reuses the odds board already in memory, so it costs no Odds API credits.
+
+### Breaking changes
+- None. Run the API once to apply migration `004_ncaa_sim_betting.sql` (it runs automatically at startup).
+
+### Known issues
+- **KenPom** needs a paid KenPom API key (`KENPOM_API_KEY`). The integration follows KenPom's documented ratings endpoint but has not been run against a live key.
+- **NET rankings** show last season's final table until the NCAA publishes the first NET of the season (early December).
+- **College injuries:** ESPN publishes few or no injury reports for college basketball, so the NCAAB injury report is usually empty.
+- **Same game parlays** pay the uncorrelated product of their legs. Real sportsbooks price them lower.
+- **Futures and unmatched games** are settled by hand from Simulated wagers (futures when the market is decided; other wagers only if the grader has not matched the game 36 hours after it started).
+- **Automatic prop grading** covers basketball props and the props the live tracker already follows for other sports. Other props wait for manual settlement.
+- **NCAAB stats payload:** `GET /api/stats/ncaab` returns about 5,500 players (roughly 3 MB). Use `/api/ncaa/players` for paged access.
+- **Odds API credits:** NCAAB adds a fifth sport to the credit-paced refresh schedule, so each sport refreshes a little less often on small plans.
+
 ## SharpStats Pro 1.6.1
 
 **Version:** 1.6.1

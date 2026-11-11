@@ -6,14 +6,15 @@
  * client requests it automatically and drops it if the provider rejects the key.
  */
 
-export type OddsSport = "nba" | "nfl" | "mlb" | "nhl";
-export const ODDS_SPORTS: OddsSport[] = ["nba", "nfl", "mlb", "nhl"];
+export type OddsSport = "nba" | "nfl" | "mlb" | "nhl" | "ncaab";
+export const ODDS_SPORTS: OddsSport[] = ["nba", "nfl", "mlb", "nhl", "ncaab"];
 
 export const SPORT_CONFIG: Record<OddsSport, { label: string; oddsApiKey: string; espnPath: string }> = {
   nba: { label: "NBA", oddsApiKey: "basketball_nba", espnPath: "basketball/nba" },
   nfl: { label: "NFL", oddsApiKey: "americanfootball_nfl", espnPath: "football/nfl" },
   mlb: { label: "MLB", oddsApiKey: "baseball_mlb", espnPath: "baseball/mlb" },
   nhl: { label: "NHL", oddsApiKey: "icehockey_nhl", espnPath: "hockey/nhl" },
+  ncaab: { label: "NCAAB", oddsApiKey: "basketball_ncaab", espnPath: "basketball/mens-college-basketball" },
 };
 
 export type BookKind = "sportsbook" | "dfs" | "reference";
@@ -96,7 +97,7 @@ export function isPricedBook(key: string): boolean {
 
 export type MarketCategory = "game" | "period" | "team" | "alternate" | "prop";
 export type MarketType = "moneyline" | "spread" | "total" | "team_total" | "prop_ou" | "prop_yes";
-export type MarketPeriod = "game" | "1h" | "1q" | "1p" | "f5";
+export type MarketPeriod = "game" | "1h" | "2h" | "1q" | "1p" | "f5";
 
 export interface MarketDef {
   key: string;
@@ -204,6 +205,25 @@ export const MARKETS: Record<OddsSport, MarketDef[]> = {
     prop("player_total_saves", "Goalie saves", "SV", "nhl.saves"),
     prop("player_save_percentage", "Save percentage", "SV%", "nhl.savePct"),
     prop("player_fantasy_points", "Fantasy points", "FPTS", "nhl.fantasy"),
+  ],
+  // College games are two 20-minute halves, so there are half markets but no quarters.
+  ncaab: [
+    ...fullGame("Spread"),
+    ...gameMarkets("1h", "_h1", "1st half"),
+    ...gameMarkets("2h", "_h2", "2nd half"),
+    ...teamAndAlternates("Spread"),
+    prop("player_points", "Points", "PTS", "nba.points"),
+    prop("player_rebounds", "Rebounds", "REB", "nba.rebounds"),
+    prop("player_assists", "Assists", "AST", "nba.assists"),
+    prop("player_threes", "3PT made", "3PM", "nba.threes"),
+    prop("player_points_rebounds", "Points + rebounds", "P+R", "nba.pr"),
+    prop("player_points_assists", "Points + assists", "P+A", "nba.pa"),
+    prop("player_rebounds_assists", "Rebounds + assists", "R+A", "nba.ra"),
+    prop("player_points_rebounds_assists", "Pts + reb + ast", "PRA", "nba.pra"),
+    prop("player_steals", "Steals", "STL", "nba.steals"),
+    prop("player_blocks", "Blocks", "BLK", "nba.blocks"),
+    prop("player_turnovers", "Turnovers", "TOV", "nba.turnovers"),
+    prop("player_double_double", "Double double", "DBL-DBL", "nba.doubleDouble", "prop_yes"),
   ],
 };
 

@@ -6,7 +6,8 @@ import {
 } from "../providers/espnStats";
 import { cached, type Cached } from "./statsCache";
 import { buildPropMetrics, buildSplits, generateInsights, generateTeamInsights, type Insight, type PropMetric, type SplitRow } from "./statsInsights";
-import { LEAGUE_DEFINITIONS, primaryGroup, type LeagueDefinition, type MetricDef, type PlayerGroupDef, type StatFormat, type TeamMetricDef } from "./statsMetrics";
+import { teamTrends, type TeamTrends } from "./ncaaTrends";
+import { LEAGUE_DEFINITIONS, primaryGroup, usageRate, type LeagueDefinition, type MetricDef, type PlayerGroupDef, type StatFormat, type TeamMetricDef } from "./statsMetrics";
 
 export type StatsWindow = "season" | "last10" | "last30";
 export const STATS_WINDOWS: StatsWindow[] = ["season", "last10", "last30"];
@@ -19,6 +20,8 @@ const WINDOW_GROUP_DEPTH = 20;
 const WINDOW_LEADER_DEPTH = 8;
 const PROVIDER_CONCURRENCY = 6;
 export const STATS_SOURCE = "ESPN public stats feeds · MLB Stats API (bullpen splits)";
+export const NCAA_STATS_SOURCE = "ESPN public stats feeds (NCAA Division I) · DraftKings closing lines via ESPN";
+const sourceFor = (league: League) => league === "ncaab" ? NCAA_STATS_SOURCE : STATS_SOURCE;
 
 export interface ColumnMeta {
   key: string;
@@ -81,6 +84,8 @@ export interface TeamRow {
   record: string;
   home: string;
   away: string;
+  /** Record against conference opponents (college and NBA). */
+  conferenceRecord: string;
   winPct: number | null;
   streak: string;
   last10: string;
@@ -219,6 +224,7 @@ function buildTeams(definition: LeagueDefinition, standings: Awaited<ReturnType<
       record: display("total") || fallbackRecord,
       home: display("home"),
       away: display("road"),
+      conferenceRecord: display("vsconf"),
       winPct: value("winpercent") ?? (gamesPlayed ? wins / gamesPlayed : null),
       streak: display("streak"),
       last10: display("lasttengames"),
@@ -254,6 +260,10 @@ async function buildLeagueBase(league: League): Promise<LeagueBase> {
       })
       : Promise.resolve(new Map<string, number>()),
   ]);
+  if (league === "ncaab") {
+    // ESPN does not publish usage rate; derive it from the player's and team's per-game totals.
+    for (const athlete of athletes) athlete.stats["derived.usageRate"] = usageRate(athlete.stats, teamStats.get(athlete.teamId)?.own);
+  }
   const rows = athletes.map((athlete) => toPlayerRow(definition, athlete)).filter((row): row is PlayerRow => row !== null);
   const byId = new Map(rows.map((row) => [row.id, row]));
   return {
@@ -361,7 +371,7 @@ export async function getLeagueStats(league: League, window: StatsWindow = "seas
     season: base.data.season,
     window,
     windowNote,
-    source: STATS_SOURCE,
+    source: sourceFor(league),
     fetchedAt: base.fetchedAt.toISOString(),
     nextRefreshAt: new Date(base.fetchedAt.getTime() + REFRESH_MS).toISOString(),
     refreshMinutes: REFRESH_MINUTES,
@@ -448,7 +458,7 @@ export async function getPlayerProfile(league: League, athleteId: string, window
     window,
     fetchedAt: log.fetchedAt.toISOString(),
     stale: log.stale || bio.stale,
-    source: STATS_SOURCE,
+    source: sourceFor(league),
     player: { ...bio.data, teamRecord: team?.record ?? null, conference: team?.conference ?? null, division: team?.division ?? null },
     group: { key: group.key, label: group.label, unit },
     seasonStats: group.columns.map((key) => {
@@ -480,6 +490,8 @@ export interface TeamProfileResponse {
   games: ProviderTeamGame[];
   splits: Array<{ label: string; games: number; record: string; pointsFor: number | null; pointsAgainst: number | null }>;
   insights: Insight[];
+  /** NCAA only: ATS and over/under records, recent form and strength of schedule. */
+  trends?: TeamTrends;
   topPlayers: Array<{ group: string; label: string; metric: ColumnMeta; players: Array<Pick<PlayerRow, "id" | "name" | "headshot" | "position"> & { value: number }> }>;
 }
 
@@ -499,12 +511,17 @@ export async function getTeamProfile(league: League, teamId: string, options: { 
   };
   const pf = team.values.pointsForPerGame ?? null;
   const pa = team.values.pointsAgainstPerGame ?? null;
+  const winPct = new Map(base.data.teams.map((item) => [item.id, item.winPct]));
+  const trends = league === "ncaab"
+    ? await teamTrends(games, (id) => winPct.get(id) ?? null).catch(() => undefined)
+    : undefined;
   return {
+    ...(trends ? { trends } : {}),
     league,
     season: base.data.season,
     fetchedAt: base.fetchedAt.toISOString(),
     stale: base.stale || schedule.stale,
-    source: STATS_SOURCE,
+    source: sourceFor(league),
     team,
     teamColumns: definition.teamMetrics.map(columnMeta),
     pointsLabel: definition.pointsLabel,

@@ -115,6 +115,8 @@ export function normalizeEspnEvent(sport: OddsSport, event: EspnEvent): { game: 
 async function scoreboard(sport: OddsSport, date?: string): Promise<EspnEvent[]> {
   const url = new URL(`${SITE_API}/apis/site/v2/sports/${SPORT_CONFIG[sport].espnPath}/scoreboard`);
   if (date) url.searchParams.set("dates", date);
+  // Group 50 = NCAA Division I; the default college scoreboard only lists ranked teams.
+  if (sport === "ncaab") { url.searchParams.set("groups", "50"); url.searchParams.set("limit", "400"); }
   const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(`ESPN scoreboard request failed (${response.status})`);
   const payload = await response.json() as { events?: EspnEvent[] };
